@@ -1,0 +1,17 @@
+{
+  "name": "warehouse-sharing-network",
+  "version": "1.0.0",
+  "description": "Mạng chia sẻ kho bãi - Blockchain warehouse sharing platform",
+  "main": "index.js",
+  "scripts": {
+    "dev": "cd backend && npm run dev",
+    "client": "cd frontend && npm start",
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../smart-contract && npm install",
+    "compile-contracts": "cd smart-contract && npx hardhat compile"
+  },
+  "keywords": ["blockchain", "warehouse", "sharing", "smart-contract"],
+  "author": "",
+  "license": "MIT"
+}
+
+

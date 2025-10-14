@@ -1,0 +1,740 @@
+{
+  "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "abi": [
+    {
+      "type": "constructor",
+      "stateMutability": "undefined",
+      "payable": false,
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "OwnableInvalidOwner",
+      "inputs": [
+        {
+          "type": "address",
+          "name": "owner"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "OwnableUnauthorizedAccount",
+      "inputs": [
+        {
+          "type": "address",
+          "name": "account"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "ReentrancyGuardReentrantCall",
+      "inputs": []
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "LeaseCancelled",
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "leaseId",
+          "indexed": true
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "LeaseCompleted",
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "leaseId",
+          "indexed": true
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "LeaseCreated",
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "leaseId",
+          "indexed": true
+        },
+        {
+          "type": "uint256",
+          "name": "warehouseId",
+          "indexed": true
+        },
+        {
+          "type": "address",
+          "name": "tenant",
+          "indexed": true
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "OwnershipTransferred",
+      "inputs": [
+        {
+          "type": "address",
+          "name": "previousOwner",
+          "indexed": true
+        },
+        {
+          "type": "address",
+          "name": "newOwner",
+          "indexed": true
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "PaymentReceived",
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "leaseId",
+          "indexed": true
+        },
+        {
+          "type": "uint256",
+          "name": "amount",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "WarehouseRegistered",
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "warehouseId",
+          "indexed": true
+        },
+        {
+          "type": "address",
+          "name": "owner",
+          "indexed": true
+        },
+        {
+          "type": "string",
+          "name": "name",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "WarehouseUpdated",
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "warehouseId",
+          "indexed": true
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "cancelLease",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "_leaseId"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "completeLease",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "_leaseId"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "createLease",
+      "constant": false,
+      "stateMutability": "payable",
+      "payable": true,
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "_warehouseId"
+        },
+        {
+          "type": "uint256",
+          "name": "_area"
+        },
+        {
+          "type": "uint256",
+          "name": "_durationInDays"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256",
+          "name": ""
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getAllActiveWarehouses",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "tuple[]",
+          "name": "",
+          "components": [
+            {
+              "type": "uint256",
+              "name": "id"
+            },
+            {
+              "type": "address",
+              "name": "owner"
+            },
+            {
+              "type": "string",
+              "name": "name"
+            },
+            {
+              "type": "string",
+              "name": "location"
+            },
+            {
+              "type": "uint256",
+              "name": "totalArea"
+            },
+            {
+              "type": "uint256",
+              "name": "availableArea"
+            },
+            {
+              "type": "uint256",
+              "name": "pricePerSqmPerDay"
+            },
+            {
+              "type": "bool",
+              "name": "isActive"
+            },
+            {
+              "type": "string",
+              "name": "imageUrl"
+            },
+            {
+              "type": "string",
+              "name": "description"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getLease",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "_leaseId"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "tuple",
+          "name": "",
+          "components": [
+            {
+              "type": "uint256",
+              "name": "id"
+            },
+            {
+              "type": "uint256",
+              "name": "warehouseId"
+            },
+            {
+              "type": "address",
+              "name": "tenant"
+            },
+            {
+              "type": "uint256",
+              "name": "area"
+            },
+            {
+              "type": "uint256",
+              "name": "startDate"
+            },
+            {
+              "type": "uint256",
+              "name": "endDate"
+            },
+            {
+              "type": "uint256",
+              "name": "totalPrice"
+            },
+            {
+              "type": "bool",
+              "name": "isActive"
+            },
+            {
+              "type": "bool",
+              "name": "isCompleted"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getOwnerWarehouses",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "address",
+          "name": "_owner"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256[]",
+          "name": ""
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getTenantLeases",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "address",
+          "name": "_tenant"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256[]",
+          "name": ""
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getWarehouse",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "_warehouseId"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "tuple",
+          "name": "",
+          "components": [
+            {
+              "type": "uint256",
+              "name": "id"
+            },
+            {
+              "type": "address",
+              "name": "owner"
+            },
+            {
+              "type": "string",
+              "name": "name"
+            },
+            {
+              "type": "string",
+              "name": "location"
+            },
+            {
+              "type": "uint256",
+              "name": "totalArea"
+            },
+            {
+              "type": "uint256",
+              "name": "availableArea"
+            },
+            {
+              "type": "uint256",
+              "name": "pricePerSqmPerDay"
+            },
+            {
+              "type": "bool",
+              "name": "isActive"
+            },
+            {
+              "type": "string",
+              "name": "imageUrl"
+            },
+            {
+              "type": "string",
+              "name": "description"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "leaseCounter",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "uint256",
+          "name": ""
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "leases",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": ""
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256",
+          "name": "id"
+        },
+        {
+          "type": "uint256",
+          "name": "warehouseId"
+        },
+        {
+          "type": "address",
+          "name": "tenant"
+        },
+        {
+          "type": "uint256",
+          "name": "area"
+        },
+        {
+          "type": "uint256",
+          "name": "startDate"
+        },
+        {
+          "type": "uint256",
+          "name": "endDate"
+        },
+        {
+          "type": "uint256",
+          "name": "totalPrice"
+        },
+        {
+          "type": "bool",
+          "name": "isActive"
+        },
+        {
+          "type": "bool",
+          "name": "isCompleted"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "owner",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "address",
+          "name": ""
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "ownerWarehouses",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "address",
+          "name": ""
+        },
+        {
+          "type": "uint256",
+          "name": ""
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256",
+          "name": ""
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "platformFeePercent",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "uint256",
+          "name": ""
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "registerWarehouse",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_name"
+        },
+        {
+          "type": "string",
+          "name": "_location"
+        },
+        {
+          "type": "uint256",
+          "name": "_totalArea"
+        },
+        {
+          "type": "uint256",
+          "name": "_pricePerSqmPerDay"
+        },
+        {
+          "type": "string",
+          "name": "_imageUrl"
+        },
+        {
+          "type": "string",
+          "name": "_description"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256",
+          "name": ""
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "renounceOwnership",
+      "constant": false,
+      "payable": false,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "setPlatformFeePercent",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "_feePercent"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "tenantLeases",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "address",
+          "name": ""
+        },
+        {
+          "type": "uint256",
+          "name": ""
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256",
+          "name": ""
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "transferOwnership",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "address",
+          "name": "newOwner"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "updateWarehouse",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": "_warehouseId"
+        },
+        {
+          "type": "string",
+          "name": "_name"
+        },
+        {
+          "type": "string",
+          "name": "_location"
+        },
+        {
+          "type": "uint256",
+          "name": "_pricePerSqmPerDay"
+        },
+        {
+          "type": "string",
+          "name": "_imageUrl"
+        },
+        {
+          "type": "string",
+          "name": "_description"
+        },
+        {
+          "type": "bool",
+          "name": "_isActive"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "warehouseCounter",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "uint256",
+          "name": ""
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "warehouses",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "uint256",
+          "name": ""
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256",
+          "name": "id"
+        },
+        {
+          "type": "address",
+          "name": "owner"
+        },
+        {
+          "type": "string",
+          "name": "name"
+        },
+        {
+          "type": "string",
+          "name": "location"
+        },
+        {
+          "type": "uint256",
+          "name": "totalArea"
+        },
+        {
+          "type": "uint256",
+          "name": "availableArea"
+        },
+        {
+          "type": "uint256",
+          "name": "pricePerSqmPerDay"
+        },
+        {
+          "type": "bool",
+          "name": "isActive"
+        },
+        {
+          "type": "string",
+          "name": "imageUrl"
+        },
+        {
+          "type": "string",
+          "name": "description"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "withdrawFees",
+      "constant": false,
+      "payable": false,
+      "inputs": [],
+      "outputs": []
+    }
+  ]
+}
