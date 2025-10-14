@@ -336,7 +336,7 @@ MIT License
 ## Liên hệ
 
 Nếu có bất kỳ câu hỏi nào, vui lòng liên hệ qua:
-- Email: support@warehouse-sharing.com
+- Email: thanh04xx@gmail.com
 - GitHub Issues: [Create an issue]
 
 ## Credits
