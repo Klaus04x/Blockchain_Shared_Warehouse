@@ -7,7 +7,9 @@
     "dev": "cd backend && npm run dev",
     "client": "cd frontend && npm start",
     "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../smart-contract && npm install",
-    "compile-contracts": "cd smart-contract && npx hardhat compile"
+    "compile-contracts": "cd smart-contract && npx hardhat compile",
+    "node": "cd smart-contract && npx hardhat node --hostname 127.0.0.1 --port 8545",
+    "dev:all": "npx concurrently \"npm:node\" \"npm:dev\" \"npm:client\""
   },
   "keywords": ["blockchain", "warehouse", "sharing", "smart-contract"],
   "author": "",
