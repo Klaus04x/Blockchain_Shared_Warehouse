@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -11,6 +11,8 @@ import {
   CircularProgress,
   Grid,
   Divider,
+  Breadcrumbs,
+  Link as MuiLink,
 } from '@mui/material';
 import {
   LocationOn,
@@ -34,15 +36,7 @@ const MyLeases = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (isConnected && account) {
-      fetchMyLeases();
-    } else {
-      setLoading(false);
-    }
-  }, [account, isConnected]);
-
-  const fetchMyLeases = async () => {
+  const fetchMyLeases = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.get(`${API_URL}/leases/tenant/${account}`);
@@ -53,7 +47,15 @@ const MyLeases = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [account]);
+
+  useEffect(() => {
+    if (isConnected && account) {
+      fetchMyLeases();
+    } else {
+      setLoading(false);
+    }
+  }, [account, isConnected, fetchMyLeases]);
 
   const handleCompleteLease = async (leaseId, blockchainId) => {
     try {
@@ -122,12 +124,16 @@ const MyLeases = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h3" gutterBottom fontWeight="bold">
-        Hợp đồng thuê của tôi
-      </Typography>
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Quản lý các hợp đồng thuê kho bãi
-      </Typography>
+      <Box sx={{ mb: 2 }}>
+        <Breadcrumbs aria-label="breadcrumb">
+          <MuiLink underline="hover" color="inherit" onClick={() => navigate('/')} sx={{ cursor: 'pointer' }}>
+            Trang chủ
+          </MuiLink>
+          <Typography color="text.primary">Hợp đồng của tôi</Typography>
+        </Breadcrumbs>
+      </Box>
+      <Typography variant="h3" gutterBottom fontWeight="bold">Hợp đồng thuê của tôi</Typography>
+      <Typography variant="body1" color="text.secondary" paragraph>Quản lý các hợp đồng thuê kho bãi</Typography>
 
       {leases.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 8 }}>
@@ -146,7 +152,7 @@ const MyLeases = () => {
         <Grid container spacing={3}>
           {leases.map((lease) => (
             <Grid item xs={12} key={lease.id}>
-              <Card>
+              <Card sx={{ overflow: 'hidden' }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
                     <Box>

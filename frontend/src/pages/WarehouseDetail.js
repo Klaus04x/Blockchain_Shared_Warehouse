@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -16,13 +16,14 @@ import {
   CircularProgress,
   Chip,
   Divider,
+  Breadcrumbs,
+  Link as MuiLink,
 } from '@mui/material';
 import {
   LocationOn,
   Square,
   AttachMoney,
   Person,
-  CalendarToday,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { ethers } from 'ethers';
@@ -45,11 +46,7 @@ const WarehouseDetail = () => {
   });
   const [processing, setProcessing] = useState(false);
 
-  useEffect(() => {
-    fetchWarehouseDetail();
-  }, [id]);
-
-  const fetchWarehouseDetail = async () => {
+  const fetchWarehouseDetail = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.get(`${API_URL}/warehouses/${id}`);
@@ -60,7 +57,11 @@ const WarehouseDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchWarehouseDetail();
+  }, [fetchWarehouseDetail]);
 
   const calculateTotalPrice = () => {
     if (!warehouse || !leaseData.area || !leaseData.duration) return 0;
@@ -205,6 +206,17 @@ const WarehouseDetail = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ mb: 2 }}>
+        <Breadcrumbs aria-label="breadcrumb">
+          <MuiLink underline="hover" color="inherit" onClick={() => navigate('/')} sx={{ cursor: 'pointer' }}>
+            Trang chủ
+          </MuiLink>
+          <MuiLink underline="hover" color="inherit" onClick={() => navigate('/warehouses')} sx={{ cursor: 'pointer' }}>
+            Kho bãi
+          </MuiLink>
+          <Typography color="text.primary">Chi tiết</Typography>
+        </Breadcrumbs>
+      </Box>
       <Grid container spacing={4}>
         <Grid item xs={12} md={8}>
           <Card>

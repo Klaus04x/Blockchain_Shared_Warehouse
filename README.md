@@ -125,11 +125,18 @@ RPC_URL=http://127.0.0.1:8545
 
 ### 5. Khởi động Hardhat Node
 
-Mở terminal mới:
+Mở terminal mới (khuyến nghị chạy qua script ở root để luôn bind IPv4 127.0.0.1:8545):
+
+```bash
+# Tại thư mục gốc dự án
+npm run node
+```
+
+Hoặc cách cũ (nếu muốn chạy trực tiếp trong thư mục smart-contract):
 
 ```bash
 cd smart-contract
-npx hardhat node
+npx hardhat node --hostname 127.0.0.1 --port 8545
 ```
 
 Lưu lại một private key từ output để dùng trong MetaMask.
@@ -177,21 +184,29 @@ REACT_APP_NETWORK_ID=1337
 
 ### 9. Khởi động ứng dụng
 
-#### Terminal 1 - Backend
+Chạy tất cả (Hardhat node + Backend + Frontend) bằng 1 lệnh tại thư mục gốc:
+
 ```bash
-cd backend
-npm run dev
+npm run dev:all
 ```
 
-Backend sẽ chạy tại: `http://localhost:5000`
+Mặc định:
+- Hardhat node: `http://127.0.0.1:8545`
+- Backend: `http://localhost:5000`
+- Frontend: `http://localhost:3000`
 
-#### Terminal 2 - Frontend
+Hoặc chạy thủ công từng phần (tùy chọn):
+
 ```bash
-cd frontend
-npm start
-```
+# Terminal 1 - Hardhat Node
+npm run node
 
-Frontend sẽ chạy tại: `http://localhost:3000`
+# Terminal 2 - Backend
+cd backend && npm run dev
+
+# Terminal 3 - Frontend
+cd frontend && npm start
+```
 
 ## Sử dụng
 

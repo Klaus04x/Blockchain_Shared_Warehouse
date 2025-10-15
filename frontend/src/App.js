@@ -17,13 +17,13 @@ import Profile from './pages/Profile';
 
 const theme = createTheme({
   palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
+    mode: 'light',
+    primary: { main: '#1976d2' },
+    secondary: { main: '#764ba2' },
+    background: { default: '#fafafa' }
   },
+  shape: { borderRadius: 12 },
+  shadows: Array.from({ length: 25 }, (_, i) => (i < 3 ? 'none' : undefined)),
   typography: {
     fontFamily: [
       '-apple-system',
@@ -34,7 +34,26 @@ const theme = createTheme({
       'Arial',
       'sans-serif',
     ].join(','),
+    h1: { fontWeight: 800 },
+    h2: { fontWeight: 800 },
+    h3: { fontWeight: 800 },
+    h4: { fontWeight: 700 }
   },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: { textTransform: 'none', borderRadius: 10 }
+      }
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: { borderRadius: 14 }
+      }
+    },
+    MuiChip: {
+      styleOverrides: { root: { borderRadius: 8 } }
+    }
+  }
 });
 
 function App() {

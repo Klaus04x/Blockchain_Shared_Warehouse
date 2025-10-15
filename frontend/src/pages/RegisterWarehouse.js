@@ -11,6 +11,8 @@ import {
   Grid,
   CircularProgress,
   Stack,
+  Breadcrumbs,
+  Link as MuiLink,
 } from '@mui/material';
 import { AddBusiness } from '@mui/icons-material';
 import axios from 'axios';
@@ -192,6 +194,17 @@ const RegisterWarehouse = () => {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
+      <Box sx={{ mb: 2 }}>
+        <Breadcrumbs aria-label="breadcrumb">
+          <MuiLink underline="hover" color="inherit" onClick={() => navigate('/')} sx={{ cursor: 'pointer' }}>
+            Trang chủ
+          </MuiLink>
+          <MuiLink underline="hover" color="inherit" onClick={() => navigate('/my-warehouses')} sx={{ cursor: 'pointer' }}>
+            Kho của tôi
+          </MuiLink>
+          <Typography color="text.primary">{editId ? 'Cập nhật' : 'Đăng ký'}</Typography>
+        </Breadcrumbs>
+      </Box>
       <Card>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>

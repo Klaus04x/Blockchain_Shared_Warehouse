@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { toast } from 'react-toastify';
 import contractABI from '../contracts/WarehouseLeasing.json';
@@ -24,40 +24,48 @@ export const Web3Provider = ({ children }) => {
   // Contract address - sẽ được cập nhật sau khi deploy
   const contractAddress = contractABI.address || '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 
-  useEffect(() => {
-    checkIfWalletIsConnected();
-    
-    if (window.ethereum) {
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-      window.ethereum.on('chainChanged', handleChainChanged);
-    }
-
-    return () => {
-      if (window.ethereum) {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        window.ethereum.removeListener('chainChanged', handleChainChanged);
-      }
-    };
+  const disconnectWallet = useCallback(() => {
+    setAccount(null);
+    setProvider(null);
+    setSigner(null);
+    setContract(null);
+    setIsConnected(false);
+    toast.info('Đã ngắt kết nối ví');
   }, []);
 
-  const checkIfWalletIsConnected = async () => {
-    try {
-      if (!window.ethereum) {
-        console.log('MetaMask is not installed');
-        return;
+  const handleAccountsChanged = useCallback((accounts) => {
+    if (accounts.length === 0) {
+      disconnectWallet();
+    } else if (accounts[0] !== account) {
+      setAccount(accounts[0]);
+      if (isConnected) {
+        toast.info('Đã chuyển tài khoản');
       }
-
-      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-      
-      if (accounts.length > 0) {
-        await connectWallet();
-      }
-    } catch (error) {
-      console.error('Error checking wallet connection:', error);
     }
-  };
+  }, [account, isConnected, disconnectWallet]);
 
-  const connectWallet = async () => {
+  const handleChainChanged = useCallback(async (newChainId) => {
+    try {
+      if (!window.ethereum) return;
+      const web3Provider = new ethers.BrowserProvider(window.ethereum);
+      const web3Signer = await web3Provider.getSigner();
+      setProvider(web3Provider);
+      setSigner(web3Signer);
+      const parsedId = typeof newChainId === 'string' ? parseInt(newChainId, 16) : newChainId;
+      if (!Number.isNaN(parsedId)) setChainId(parsedId);
+      // Rebind contract with new signer if already connected
+      if (account) {
+        const c = new ethers.Contract(contractAddress, contractABI.abi, web3Signer);
+        setContract(c);
+      }
+    } catch (e) {
+      console.error('Error handling chain change:', e);
+    }
+  }, [account, contractAddress]);
+
+  
+
+  const connectWallet = useCallback(async () => {
     try {
       if (!window.ethereum) {
         toast.error('Vui lòng cài đặt MetaMask!');
@@ -109,34 +117,41 @@ export const Web3Provider = ({ children }) => {
       setChainId(network.chainId);
       setIsConnected(true);
 
-      toast.success('Đã kết nối ví thành công!');
+      toast.success('Đã kết nối ví thành công!', { toastId: 'wallet-connected' });
     } catch (error) {
       console.error('Error connecting wallet:', error);
       toast.error('Không thể kết nối ví!');
     }
-  };
+  }, [contractAddress]);
 
-  const disconnectWallet = () => {
-    setAccount(null);
-    setProvider(null);
-    setSigner(null);
-    setContract(null);
-    setIsConnected(false);
-    toast.info('Đã ngắt kết nối ví');
-  };
-
-  const handleAccountsChanged = (accounts) => {
-    if (accounts.length === 0) {
-      disconnectWallet();
-    } else if (accounts[0] !== account) {
-      setAccount(accounts[0]);
-      toast.info('Đã chuyển tài khoản');
+  const checkIfWalletIsConnected = useCallback(async () => {
+    try {
+      if (!window.ethereum) {
+        return;
+      }
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      // Không tự động connect; chỉ nhận biết tài khoản có sẵn
+      if (accounts.length > 0) setAccount(accounts[0]);
+    } catch (error) {
+      console.error('Error checking wallet connection:', error);
     }
-  };
+  }, []);
 
-  const handleChainChanged = () => {
-    window.location.reload();
-  };
+  useEffect(() => {
+    checkIfWalletIsConnected();
+
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+      window.ethereum.on('chainChanged', handleChainChanged);
+    }
+
+    return () => {
+      if (window.ethereum) {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
+      }
+    };
+  }, [checkIfWalletIsConnected, handleAccountsChanged, handleChainChanged]);
 
   const switchToLocalNetwork = async () => {
     try {
