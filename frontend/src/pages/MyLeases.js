@@ -31,7 +31,7 @@ import { toast } from 'react-toastify';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const MyLeases = () => {
-  const { account, isConnected, contract } = useWeb3();
+  const { account, isConnected, refreshContract } = useWeb3();
   const [leases, setLeases] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -59,7 +59,14 @@ const MyLeases = () => {
 
   const handleCompleteLease = async (leaseId, blockchainId) => {
     try {
-      const tx = await contract.completeLease(blockchainId);
+      // Refresh contract để đảm bảo sử dụng account hiện tại
+      const currentContract = await refreshContract();
+      if (!currentContract) {
+        toast.error('Không thể kết nối với hợp đồng. Vui lòng thử lại.');
+        return;
+      }
+      
+      const tx = await currentContract.completeLease(blockchainId);
       toast.info('Đang xử lý...');
       await tx.wait();
 

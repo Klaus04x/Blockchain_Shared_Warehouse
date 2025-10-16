@@ -23,7 +23,7 @@ import { useWeb3 } from '../contexts/Web3Context';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const RegisterWarehouse = () => {
-  const { contract, account, isConnected } = useWeb3();
+  const { account, isConnected, refreshContract } = useWeb3();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [processing, setProcessing] = useState(false);
@@ -111,13 +111,22 @@ const RegisterWarehouse = () => {
 
     try {
       setProcessing(true);
+      
+      // Refresh contract để đảm bảo sử dụng account hiện tại
+      const currentContract = await refreshContract();
+      if (!currentContract) {
+        toast.error('Không thể kết nối với hợp đồng. Vui lòng thử lại.');
+        setProcessing(false);
+        return;
+      }
+      
       const priceInWei = ethers.parseEther(formData.pricePerSqmPerDay);
 
       if (editId) {
         // Update on-chain nếu có thể (cùng owner)
         try {
           const current = await axios.get(`${API_URL}/warehouses/${editId}`);
-          await (await contract.updateWarehouse(
+          await (await currentContract.updateWarehouse(
             Number(current.data.blockchain_id),
             formData.name,
             formData.location,
@@ -141,23 +150,40 @@ const RegisterWarehouse = () => {
         toast.success('Cập nhật kho thành công!');
         navigate('/my-warehouses');
       } else {
-        // Create on-chain
-        const tx = await contract.registerWarehouse(
+        // Lấy gas settings tối ưu
+        let gasSettings = {};
+        try {
+          const feeData = await currentContract.runner.provider.getFeeData();
+          gasSettings = {
+            maxFeePerGas: feeData.maxFeePerGas ? feeData.maxFeePerGas * 2n : ethers.parseUnits('20', 'gwei'),
+            maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ? feeData.maxPriorityFeePerGas * 2n : ethers.parseUnits('2', 'gwei'),
+            gasLimit: 500000
+          };
+        } catch (gasErr) {
+          gasSettings = {
+            gasPrice: ethers.parseUnits('20', 'gwei'),
+            gasLimit: 500000
+          };
+        }
+
+        // Create on-chain với gas settings
+        const tx = await currentContract.registerWarehouse(
           formData.name,
           formData.location,
           formData.totalArea,
           priceInWei,
           formData.imageUrl || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d',
-          formData.description
+          formData.description,
+          gasSettings
         );
         toast.info('Đang xử lý giao dịch...');
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { const parsed = contract.interface.parseLog(log); return parsed.name === 'WarehouseRegistered'; } catch { return false; }
+          try { const parsed = currentContract.interface.parseLog(log); return parsed.name === 'WarehouseRegistered'; } catch { return false; }
         });
         let warehouseId = 0;
         if (event) {
-          const parsed = contract.interface.parseLog(event);
+          const parsed = currentContract.interface.parseLog(event);
           warehouseId = parsed.args.warehouseId.toString();
         }
         await axios.post(`${API_URL}/warehouses`, {

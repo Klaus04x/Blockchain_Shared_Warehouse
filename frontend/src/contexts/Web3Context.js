@@ -33,16 +33,32 @@ export const Web3Provider = ({ children }) => {
     toast.info('Đã ngắt kết nối ví');
   }, []);
 
-  const handleAccountsChanged = useCallback((accounts) => {
+  const handleAccountsChanged = useCallback(async (accounts) => {
     if (accounts.length === 0) {
       disconnectWallet();
     } else if (accounts[0] !== account) {
       setAccount(accounts[0]);
       if (isConnected) {
-        toast.info('Đã chuyển tài khoản');
+        // Cập nhật lại contract với signer mới
+        try {
+          const web3Provider = new ethers.BrowserProvider(window.ethereum);
+          const web3Signer = await web3Provider.getSigner();
+          const warehouseContract = new ethers.Contract(
+            contractAddress,
+            contractABI.abi,
+            web3Signer
+          );
+          setProvider(web3Provider);
+          setSigner(web3Signer);
+          setContract(warehouseContract);
+          toast.info('Đã chuyển tài khoản');
+        } catch (error) {
+          console.error('Error updating contract with new account:', error);
+          toast.error('Lỗi khi chuyển tài khoản');
+        }
       }
     }
-  }, [account, isConnected, disconnectWallet]);
+  }, [account, isConnected, disconnectWallet, contractAddress]);
 
   const handleChainChanged = useCallback(async (newChainId) => {
     try {
@@ -187,6 +203,30 @@ export const Web3Provider = ({ children }) => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
+  // Function để refresh contract với account hiện tại
+  const refreshContract = useCallback(async () => {
+    try {
+      if (!window.ethereum || !isConnected) return;
+      
+      const web3Provider = new ethers.BrowserProvider(window.ethereum);
+      const web3Signer = await web3Provider.getSigner();
+      const warehouseContract = new ethers.Contract(
+        contractAddress,
+        contractABI.abi,
+        web3Signer
+      );
+      
+      setProvider(web3Provider);
+      setSigner(web3Signer);
+      setContract(warehouseContract);
+      
+      return warehouseContract;
+    } catch (error) {
+      console.error('Error refreshing contract:', error);
+      return null;
+    }
+  }, [isConnected, contractAddress]);
+
   const value = {
     account,
     provider,
@@ -198,7 +238,8 @@ export const Web3Provider = ({ children }) => {
     connectWallet,
     disconnectWallet,
     switchToLocalNetwork,
-    formatAddress
+    formatAddress,
+    refreshContract
   };
 
   return (

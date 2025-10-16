@@ -35,7 +35,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 const WarehouseDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { contract, account, isConnected } = useWeb3();
+  const { account, isConnected, refreshContract } = useWeb3();
 
   const [warehouse, setWarehouse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +45,8 @@ const WarehouseDetail = () => {
     duration: '',
   });
   const [processing, setProcessing] = useState(false);
+  const [debugInfo, setDebugInfo] = useState(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   const fetchWarehouseDetail = useCallback(async () => {
     try {
@@ -62,6 +64,13 @@ const WarehouseDetail = () => {
   useEffect(() => {
     fetchWarehouseDetail();
   }, [fetchWarehouseDetail]);
+
+  // Theo dõi sự thay đổi của account để hiển thị thông báo
+  useEffect(() => {
+    if (account && isConnected) {
+      console.log('Current account:', account);
+    }
+  }, [account, isConnected]);
 
   const calculateTotalPrice = () => {
     if (!warehouse || !leaseData.area || !leaseData.duration) return 0;
@@ -89,47 +98,131 @@ const WarehouseDetail = () => {
 
     try {
       setProcessing(true);
-    // Kiểm tra on-chain: kho tồn tại và còn hoạt động
-    if (!contract) {
-      toast.error('Không tìm thấy kết nối hợp đồng. Vui lòng kết nối ví.');
-      setProcessing(false);
-      return;
-    }
-    try {
-      const onchainWarehouse = await contract.getWarehouse(warehouse.blockchain_id);
-      // Khi chưa có trên chain, owner sẽ là address(0) hoặc isActive = false
-      if (!onchainWarehouse || onchainWarehouse.owner === ethers.ZeroAddress || !onchainWarehouse.isActive) {
-        toast.error('Kho này chưa tồn tại hoặc không hoạt động trên blockchain. Vui lòng đăng ký kho mới rồi thử thuê.');
+      
+      // Refresh contract để đảm bảo sử dụng account hiện tại
+      const currentContract = await refreshContract();
+      if (!currentContract) {
+        toast.error('Không thể kết nối với hợp đồng. Vui lòng thử lại.');
         setProcessing(false);
         return;
       }
-      const avail = ethers.toBigInt(onchainWarehouse.availableArea ?? 0);
-      const req = ethers.toBigInt(leaseData.area);
-      if (req > avail) {
-        toast.error('Diện tích yêu cầu vượt quá diện tích còn trống (trên blockchain).');
-        setProcessing(false);
-        return;
+      
+      // Kiểm tra on-chain: kho tồn tại và còn hoạt động
+      try {
+        // Kiểm tra blockchain_id hợp lệ
+        if (!warehouse.blockchain_id || warehouse.blockchain_id === 0) {
+          console.warn('Warehouse chưa có blockchain_id, bỏ qua kiểm tra on-chain');
+          toast.warning('Kho này chưa được đăng ký trên blockchain. Tiếp tục với dữ liệu database...');
+        } else {
+          console.log('Checking warehouse on blockchain:', warehouse.blockchain_id);
+          const onchainWarehouse = await currentContract.getWarehouse(warehouse.blockchain_id);
+          console.log('On-chain warehouse data:', onchainWarehouse);
+          
+          // Khi chưa có trên chain, owner sẽ là address(0) hoặc isActive = false
+          if (!onchainWarehouse || onchainWarehouse.owner === ethers.ZeroAddress || !onchainWarehouse.isActive) {
+            toast.error('Kho này chưa tồn tại hoặc không hoạt động trên blockchain. Vui lòng đăng ký kho mới rồi thử thuê.');
+            setProcessing(false);
+            return;
+          }
+          const avail = ethers.toBigInt(onchainWarehouse.availableArea ?? 0);
+          const req = ethers.toBigInt(leaseData.area);
+          if (req > avail) {
+            toast.error(`Diện tích yêu cầu vượt quá diện tích còn trống (trên blockchain). Cần: ${leaseData.area}m², Có sẵn: ${avail.toString()}m²`);
+            setProcessing(false);
+            return;
+          }
+        }
+      } catch (chainErr) {
+        console.error('On-chain warehouse check failed:', chainErr);
+        
+        // Phân tích lỗi chi tiết
+        if (chainErr.message?.includes('call revert exception')) {
+          toast.error('Kho này không tồn tại trên blockchain. Vui lòng đăng ký kho trước khi thuê.');
+        } else if (chainErr.message?.includes('network')) {
+          toast.error('Lỗi kết nối blockchain. Vui lòng kiểm tra Hardhat node và thử lại.');
+        } else if (chainErr.message?.includes('contract')) {
+          toast.error('Lỗi kết nối hợp đồng. Vui lòng kiểm tra contract address và thử lại.');
+        } else {
+          toast.warning('Không thể kiểm tra kho trên blockchain. Tiếp tục với dữ liệu database...');
+        }
+        
+        // Không dừng lại, tiếp tục với database validation
+        console.log('Continuing with database validation only...');
       }
-    } catch (chainErr) {
-      console.error('On-chain warehouse check failed:', chainErr);
-    }
+      
       const totalPrice = calculateTotalPrice();
+      
+      // Lưu thông tin debug
+      const paymentDetails = {
+        warehouseId: warehouse.blockchain_id,
+        area: leaseData.area,
+        duration: leaseData.duration,
+        totalPrice: totalPrice.toString(),
+        account: account,
+        timestamp: new Date().toISOString()
+      };
+      console.log('Payment details:', paymentDetails);
+      setDebugInfo(paymentDetails);
 
-      // Gọi smart contract
-      const tx = await contract.createLease(
+      // Kiểm tra số dư trước khi gửi giao dịch
+      try {
+        const balance = await currentContract.runner.provider.getBalance(account);
+        console.log('Account balance:', ethers.formatEther(balance));
+        if (balance < totalPrice) {
+          toast.error(`Số dư không đủ. Cần: ${ethers.formatEther(totalPrice)} ETH, Có: ${ethers.formatEther(balance)} ETH`);
+          setProcessing(false);
+          return;
+        }
+      } catch (balanceErr) {
+        console.error('Balance check failed:', balanceErr);
+        toast.warning('Không thể kiểm tra số dư. Tiếp tục giao dịch...');
+      }
+
+      // Lấy gas settings tối ưu
+      let gasSettings = {};
+      try {
+        const feeData = await currentContract.runner.provider.getFeeData();
+        console.log('Gas fee data:', {
+          gasPrice: ethers.formatUnits(feeData.gasPrice, 'gwei') + ' Gwei',
+          maxFee: ethers.formatUnits(feeData.maxFeePerGas, 'gwei') + ' Gwei',
+          maxPriorityFee: ethers.formatUnits(feeData.maxPriorityFeePerGas, 'gwei') + ' Gwei'
+        });
+
+        // Sử dụng EIP-1559 gas settings cho localhost
+        gasSettings = {
+          value: totalPrice,
+          maxFeePerGas: feeData.maxFeePerGas ? feeData.maxFeePerGas * 2n : ethers.parseUnits('20', 'gwei'), // Tăng gấp đôi để tránh dropped
+          maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ? feeData.maxPriorityFeePerGas * 2n : ethers.parseUnits('2', 'gwei'),
+          gasLimit: 500000 // Gas limit cao để đảm bảo không bị out of gas
+        };
+      } catch (gasErr) {
+        console.warn('Failed to get fee data, using fallback gas settings:', gasErr);
+        // Fallback gas settings cho localhost
+        gasSettings = {
+          value: totalPrice,
+          gasPrice: ethers.parseUnits('20', 'gwei'), // 20 Gwei cho localhost
+          gasLimit: 500000
+        };
+      }
+
+      console.log('Using gas settings:', gasSettings);
+
+      // Gọi smart contract với gas settings tối ưu
+      const tx = await currentContract.createLease(
         warehouse.blockchain_id,
         leaseData.area,
         leaseData.duration,
-        { value: totalPrice }
+        gasSettings
       );
 
-      toast.info('Đang xử lý giao dịch...');
+      console.log('Transaction sent:', tx.hash);
+      toast.info(`Đang xử lý giao dịch... Hash: ${tx.hash.substring(0, 10)}...`);
       const receipt = await tx.wait();
 
       // Lấy lease ID từ event
       const event = receipt.logs.find((log) => {
         try {
-          const parsed = contract.interface.parseLog(log);
+          const parsed = currentContract.interface.parseLog(log);
           return parsed.name === 'LeaseCreated';
         } catch (e) {
           return false;
@@ -138,7 +231,7 @@ const WarehouseDetail = () => {
 
       let leaseId = 0;
       if (event) {
-        const parsed = contract.interface.parseLog(event);
+        const parsed = currentContract.interface.parseLog(event);
         leaseId = parsed.args.leaseId.toString();
       }
 
@@ -163,7 +256,37 @@ const WarehouseDetail = () => {
       navigate('/my-leases');
     } catch (error) {
       console.error('Error creating lease:', error);
-      toast.error('Không thể tạo hợp đồng thuê');
+      
+      // Phân tích lỗi chi tiết
+      let errorMessage = 'Không thể tạo hợp đồng thuê';
+      
+      if (error.code === 'INSUFFICIENT_FUNDS') {
+        errorMessage = 'Số dư không đủ để thực hiện giao dịch';
+      } else if (error.code === 'USER_REJECTED') {
+        errorMessage = 'Bạn đã hủy giao dịch';
+      } else if (error.code === 'NETWORK_ERROR') {
+        errorMessage = 'Lỗi mạng. Vui lòng kiểm tra kết nối và thử lại';
+      } else if (error.message?.includes('Warehouse is not active')) {
+        errorMessage = 'Kho này không còn hoạt động';
+      } else if (error.message?.includes('Invalid area')) {
+        errorMessage = 'Diện tích không hợp lệ';
+      } else if (error.message?.includes('Insufficient payment')) {
+        errorMessage = 'Số tiền thanh toán không đủ';
+      } else if (error.message?.includes('Duration must be greater than 0')) {
+        errorMessage = 'Thời gian thuê phải lớn hơn 0';
+      } else if (error.reason) {
+        errorMessage = `Lỗi: ${error.reason}`;
+      }
+      
+      toast.error(errorMessage);
+      
+      // Log chi tiết để debug
+      console.log('Error details:', {
+        code: error.code,
+        message: error.message,
+        reason: error.reason,
+        data: error.data
+      });
     } finally {
       setProcessing(false);
     }
@@ -329,6 +452,42 @@ const WarehouseDetail = () => {
                 >
                   Vui lòng kết nối ví MetaMask để thuê kho
                 </Typography>
+              )}
+
+              {/* Debug Panel */}
+              {debugInfo && (
+                <Box sx={{ mt: 2 }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setShowDebug(!showDebug)}
+                    sx={{ width: '100%' }}
+                  >
+                    {showDebug ? 'Ẩn' : 'Hiện'} Debug Info
+                  </Button>
+                  {showDebug && (
+                    <Box sx={{ mt: 1, p: 1, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                      <Typography variant="caption" display="block">
+                        <strong>Account:</strong> {account}
+                      </Typography>
+                      <Typography variant="caption" display="block">
+                        <strong>Warehouse ID:</strong> {debugInfo.warehouseId}
+                      </Typography>
+                      <Typography variant="caption" display="block">
+                        <strong>Area:</strong> {debugInfo.area}m²
+                      </Typography>
+                      <Typography variant="caption" display="block">
+                        <strong>Duration:</strong> {debugInfo.duration} ngày
+                      </Typography>
+                      <Typography variant="caption" display="block">
+                        <strong>Total Price:</strong> {ethers.formatEther(debugInfo.totalPrice)} ETH
+                      </Typography>
+                      <Typography variant="caption" display="block">
+                        <strong>Time:</strong> {new Date(debugInfo.timestamp).toLocaleString()}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
               )}
             </CardContent>
           </Card>
