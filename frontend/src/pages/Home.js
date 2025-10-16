@@ -7,8 +7,6 @@ import {
   Button,
   Grid,
   Card,
-  CardContent,
-  CardMedia,
 } from '@mui/material';
 import {
   Warehouse,

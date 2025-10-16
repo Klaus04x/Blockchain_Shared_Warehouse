@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Card,
@@ -31,15 +31,7 @@ const Profile = () => {
     avatar_url: '',
   });
 
-  useEffect(() => {
-    if (isConnected && account) {
-      fetchProfile();
-    } else {
-      setLoading(false);
-    }
-  }, [account, isConnected]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.post(`${API_URL}/users/profile`, {
@@ -51,7 +43,15 @@ const Profile = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [account]);
+
+  useEffect(() => {
+    if (isConnected && account) {
+      fetchProfile();
+    } else {
+      setLoading(false);
+    }
+  }, [account, isConnected, fetchProfile]);
 
   const handleChange = (e) => {
     setProfile({

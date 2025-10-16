@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -28,21 +28,13 @@ import { toast } from 'react-toastify';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const MyWarehouses = () => {
-  const { account, isConnected, contract } = useWeb3();
+  const { account, isConnected } = useWeb3();
   const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (isConnected && account) {
-      fetchMyWarehouses();
-    } else {
-      setLoading(false);
-    }
-  }, [account, isConnected]);
-
-  const fetchMyWarehouses = async () => {
+  const fetchMyWarehouses = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.get(`${API_URL}/warehouses/owner/${account}`);
@@ -53,7 +45,15 @@ const MyWarehouses = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [account]);
+
+  useEffect(() => {
+    if (isConnected && account) {
+      fetchMyWarehouses();
+    } else {
+      setLoading(false);
+    }
+  }, [account, isConnected, fetchMyWarehouses]);
 
   const formatPrice = (weiPrice) => {
     try {
@@ -64,37 +64,6 @@ const MyWarehouses = () => {
     }
   };
 
-  const handleDelete = async (warehouse) => {
-    if (!window.confirm(`Xóa kho "${warehouse.name}"? Hành động này sẽ tạm ngừng hoạt động kho.`)) return;
-    try {
-      setDeletingId(warehouse.id);
-      // Ngưng hoạt động trên smart contract nếu có quyền
-      try {
-        if (contract && warehouse.blockchain_id) {
-          await (await contract.updateWarehouse(
-            warehouse.blockchain_id,
-            warehouse.name,
-            warehouse.location,
-            ethers.toBigInt(warehouse.price_per_sqm_per_day),
-            warehouse.image_url || '',
-            warehouse.description || '',
-            false
-          )).wait();
-        }
-      } catch (e) {
-        console.warn('Contract update failed (deactivate):', e);
-      }
-      // Soft delete trong DB
-      await axios.delete(`${API_URL}/warehouses/${warehouse.id}`);
-      toast.success('Đã xóa (ngưng hoạt động) kho');
-      fetchMyWarehouses();
-    } catch (error) {
-      console.error('Delete warehouse error:', error);
-      toast.error('Không thể xóa kho');
-    } finally {
-      setDeletingId(null);
-    }
-  };
 
   if (!isConnected) {
     return (
