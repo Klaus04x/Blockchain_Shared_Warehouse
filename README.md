@@ -16,7 +16,7 @@
 
 ### 1. Clone repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/Klaus04x/Blockchain_Shared_Warehouse
 cd Blockchain_Shared_Warehouse
 ```
 
