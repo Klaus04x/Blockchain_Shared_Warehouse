@@ -133,17 +133,22 @@ const RegisterWarehouse = () => {
       let cleanDescription = (formData.description || '').trim();
       let cleanImageUrl = (formData.imageUrl || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d').trim();
       
-      // STRICT limit: max 100 characters for description (to be safe)
+      // STRICT limit: max 100 characters for description
       if (cleanDescription.length > 100) {
         console.warn('⚠️ Description too long! Truncating from', cleanDescription.length, 'to 100 characters');
         cleanDescription = cleanDescription.substring(0, 100);
         toast.warning('Mô tả quá dài! Đã được cắt xuống 100 ký tự. Vui lòng rút gọn mô tả.', { autoClose: 5000 });
       }
       
-      // Limit imageUrl
-      if (cleanImageUrl.length > 200) {
-        cleanImageUrl = cleanImageUrl.substring(0, 200);
+      // Limit imageUrl to prevent large transaction data (increased to 300 chars)
+      if (cleanImageUrl.length > 300) {
+        cleanImageUrl = cleanImageUrl.substring(0, 300);
       }
+      
+      // Ensure strings are safe for blockchain (keep Vietnamese characters but remove problematic ones)
+      // Chỉ loại bỏ các ký tự có thể gây lỗi blockchain, giữ lại tiếng Việt
+      cleanDescription = cleanDescription.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ''); // Remove control characters only
+      cleanImageUrl = cleanImageUrl.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ''); // Remove control characters only
       
       console.log('📝 Cleaned data:');
       console.log('  Description length:', cleanDescription.length, 'chars');
@@ -184,7 +189,7 @@ const RegisterWarehouse = () => {
         // Hardhat node không hỗ trợ EIP-1559, chỉ dùng gasPrice
         const gasSettings = {
           gasPrice: ethers.parseUnits('20', 'gwei'),
-          gasLimit: 500000
+          gasLimit: 1000000  // Tăng gas limit để tránh lỗi
         };
         console.log('Gas settings (legacy):', gasSettings);
 
@@ -267,8 +272,13 @@ const RegisterWarehouse = () => {
           // Xử lý các loại lỗi cụ thể
           if (txError.code === 'ACTION_REJECTED' || txError.code === 4001) {
             toast.error('Bạn đã từ chối giao dịch trong MetaMask');
-          } else if (txError.code === 'NETWORK_ERROR' || txError.message.includes('JSON-RPC')) {
+          } else if (txError.code === 'NETWORK_ERROR' || txError.message.includes('JSON-RPC') || txError.code === -32603) {
             toast.error('Lỗi kết nối blockchain. Vui lòng kiểm tra Hardhat network và thử lại.');
+            console.error('JSON-RPC Error details:', {
+              code: txError.code,
+              message: txError.message,
+              data: txError.data
+            });
           } else if (txError.code === 'INSUFFICIENT_FUNDS' || txError.code === -32000) {
             toast.error('Không đủ ETH để thực hiện giao dịch. Vui lòng nạp thêm ETH.');
           } else if (txError.code === 'UNPREDICTABLE_GAS_LIMIT') {
@@ -525,7 +535,7 @@ const RegisterWarehouse = () => {
                     value={formData.imageUrl}
                     onChange={handleChange}
                     placeholder="https://example.com/image.jpg"
-                    helperText="Bạn có thể dán URL hoặc chọn file để tải lên"
+                    helperText="Bạn có thể dán URL hoặc chọn file để tải lên (tối đa 300 ký tự)"
                   />
                 </Stack>
                 {previewUrl && (
@@ -544,7 +554,7 @@ const RegisterWarehouse = () => {
                   onChange={handleChange}
                   multiline
                   rows={4}
-                  placeholder="Mô tả về kho bãi của bạn (tối đa 300 ký tự)..."
+                  placeholder="Mô tả về kho bãi của bạn (tối đa 100 ký tự)..."
                   inputProps={{ maxLength: 100 }}
                   helperText={`${formData.description?.length || 0}/100 ký tự (Lưu ý: Mô tả quá dài sẽ gây lỗi blockchain)`}
                   error={formData.description?.length > 100}

@@ -135,15 +135,23 @@ const WarehouseDetail = () => {
       } catch (chainErr) {
         console.error('On-chain warehouse check failed:', chainErr);
         
-        // Phân tích lỗi chi tiết
-        if (chainErr.message?.includes('call revert exception')) {
-          toast.error('Kho này không tồn tại trên blockchain. Vui lòng đăng ký kho trước khi thuê.');
-        } else if (chainErr.message?.includes('network')) {
-          toast.error('Lỗi kết nối blockchain. Vui lòng kiểm tra Hardhat node và thử lại.');
-        } else if (chainErr.message?.includes('contract')) {
-          toast.error('Lỗi kết nối hợp đồng. Vui lòng kiểm tra contract address và thử lại.');
+        // Kiểm tra nếu contract không hoạt động (BAD_DATA error)
+        if (chainErr.message?.includes('could not decode result data') || 
+            chainErr.message?.includes('BAD_DATA') ||
+            chainErr.code === 'BAD_DATA') {
+          console.log('Contract not working, skipping blockchain check');
+          toast.info('Blockchain đang được khởi tạo. Tiếp tục với dữ liệu database...');
         } else {
-          toast.warning('Không thể kiểm tra kho trên blockchain. Tiếp tục với dữ liệu database...');
+          // Phân tích lỗi chi tiết cho các trường hợp khác
+          if (chainErr.message?.includes('call revert exception')) {
+            toast.error('Kho này không tồn tại trên blockchain. Vui lòng đăng ký kho trước khi thuê.');
+          } else if (chainErr.message?.includes('network')) {
+            toast.error('Lỗi kết nối blockchain. Vui lòng kiểm tra Hardhat node và thử lại.');
+          } else if (chainErr.message?.includes('contract')) {
+            toast.error('Lỗi kết nối hợp đồng. Vui lòng kiểm tra contract address và thử lại.');
+          } else {
+            toast.warning('Không thể kiểm tra kho trên blockchain. Tiếp tục với dữ liệu database...');
+          }
         }
         
         // Không dừng lại, tiếp tục với database validation
@@ -182,14 +190,14 @@ const WarehouseDetail = () => {
       // Hardhat node không hỗ trợ EIP-1559, chỉ dùng gasPrice
       const gasSettings = {
         value: totalPrice,
-        gasPrice: ethers.parseUnits('1', 'gwei'), // Gas price thấp
-        gasLimit: 500000  // Tăng gas limit để tránh "out of gas"
+        gasPrice: ethers.parseUnits('20', 'gwei'), // Tăng gas price để tránh lỗi
+        gasLimit: 800000  // Tăng gas limit để tránh "out of gas"
       };
       
       console.log('Using gas settings (legacy):', {
         value: ethers.formatEther(totalPrice) + ' ETH',
-        gasPrice: '1 Gwei',
-        gasLimit: 500000
+        gasPrice: '20 Gwei',
+        gasLimit: 800000
       });
       console.log('Creating lease for warehouse:', {
         blockchain_id: warehouse.blockchain_id,

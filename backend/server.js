@@ -54,9 +54,20 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`API: http://localhost:${PORT}/api`);
+});
+
+// Xử lý lỗi port đã được sử dụng - chỉ báo lỗi một lần
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`❌ Port ${PORT} đang được sử dụng. Vui lòng chạy: npm run kill-all`);
+    process.exit(1);
+  } else {
+    console.error('❌ Lỗi server:', err.message);
+    process.exit(1);
+  }
 });
 
 module.exports = app;

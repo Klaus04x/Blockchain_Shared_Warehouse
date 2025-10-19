@@ -10,7 +10,15 @@
     "compile-contracts": "cd smart-contract && npx hardhat compile",
     "node": "cd smart-contract && npx hardhat node --hostname 127.0.0.1 --port 8545",
     "deploy": "cd smart-contract && npx hardhat run scripts/deploy.js --network localhost",
-    "dev:all": "npx concurrently \"npm:node\" \"node auto-deploy.js\" \"npm:dev\" \"npm:client\""
+    "dev:all": "npx concurrently \"npm:node\" \"npm:deploy\" \"npm:dev\" \"npm:client\"",
+    "dev:all:preserve": "npx concurrently \"node persistent-blockchain-manager.js\" \"npm:dev\" \"npm:client\"",
+    "sync-warehouses": "node sync-warehouses.js",
+    "auto-sync": "node auto-sync-warehouses.js",
+    "fix-blockchain": "node fix-blockchain.js",
+    "kill-all": "node kill-all-ports.js",
+    "contract-info": "node contract-address-manager.js info",
+    "contract-check": "node contract-address-manager.js check",
+    "contract-clear": "node contract-address-manager.js clear"
   },
   "keywords": [
     "blockchain",
@@ -21,7 +29,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "cors": "^2.8.5",
     "ethers": "^6.15.0",
+    "express": "^5.1.0",
     "mysql2": "^3.15.2"
   },
   "devDependencies": {

@@ -2,55 +2,51 @@ const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
+// Import ContractAddressManager
+const ContractAddressManager = require("../../contract-address-manager");
+
 async function main() {
-  console.log("Deploying WarehouseLeasing contract...");
+  console.log("🚀 Deploying WarehouseLeasing contract...");
 
   const [deployer] = await hre.ethers.getSigners();
-  console.log("Deploying with account:", deployer.address);
+  console.log("📋 Deploying with account:", deployer.address);
+  console.log("💰 Account balance:", hre.ethers.formatEther(await deployer.provider.getBalance(deployer.address)), "ETH");
 
   const WarehouseLeasing = await hre.ethers.getContractFactory("WarehouseLeasing");
   const warehouseLeasing = await WarehouseLeasing.deploy();
 
+  console.log("⏳ Waiting for deployment...");
   await warehouseLeasing.waitForDeployment();
 
   const contractAddress = await warehouseLeasing.getAddress();
-  console.log("WarehouseLeasing deployed to:", contractAddress);
+  console.log("✅ WarehouseLeasing deployed to:", contractAddress);
 
-  // Lưu địa chỉ contract và ABI
-  const contractData = {
-    address: contractAddress,
-    abi: JSON.parse(warehouseLeasing.interface.formatJson())
+  // Lấy ABI
+  const contractABI = JSON.parse(warehouseLeasing.interface.formatJson());
+
+  // Lưu địa chỉ contract và metadata
+  const deployInfo = {
+    deployer: deployer.address,
+    gasUsed: "Unknown", // Hardhat không cung cấp gas used trong deployment
+    blockNumber: await deployer.provider.getBlockNumber()
   };
 
-  // Lưu vào frontend
-  const frontendDir = path.join(__dirname, "../../frontend/src/contracts");
-  if (!fs.existsSync(frontendDir)) {
-    fs.mkdirSync(frontendDir, { recursive: true });
-  }
+  const saved = ContractAddressManager.saveContractAddress(contractAddress, contractABI, deployInfo);
   
-  fs.writeFileSync(
-    path.join(frontendDir, "WarehouseLeasing.json"),
-    JSON.stringify(contractData, null, 2)
-  );
-
-  // Lưu vào backend
-  const backendDir = path.join(__dirname, "../../backend/contracts");
-  if (!fs.existsSync(backendDir)) {
-    fs.mkdirSync(backendDir, { recursive: true });
+  if (saved) {
+    console.log("✅ Contract address saved successfully!");
+    console.log("💡 Contract will be reused on next startup");
+  } else {
+    console.log("❌ Failed to save contract address");
   }
-  
-  fs.writeFileSync(
-    path.join(backendDir, "WarehouseLeasing.json"),
-    JSON.stringify(contractData, null, 2)
-  );
 
-  console.log("Contract data saved to frontend and backend");
+  console.log("🎉 Deployment completed successfully!");
 }
 
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error(error);
+    console.error("❌ Deployment failed:", error);
     process.exit(1);
   });
 

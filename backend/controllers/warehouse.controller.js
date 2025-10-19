@@ -63,6 +63,30 @@ exports.createWarehouse = async (req, res) => {
       description
     } = req.body;
 
+    // Validate required fields
+    if (!blockchain_id || !owner_address || !name || !location) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: blockchain_id, owner_address, name, location' 
+      });
+    }
+
+    // Validate blockchain_id is a positive number
+    if (isNaN(blockchain_id) || parseInt(blockchain_id) <= 0) {
+      return res.status(400).json({ 
+        error: 'Invalid blockchain_id: must be a positive number' 
+      });
+    }
+
+    console.log('Creating warehouse in database:', {
+      blockchain_id,
+      owner_address,
+      name,
+      location,
+      total_area,
+      available_area,
+      price_per_sqm_per_day
+    });
+
     const [result] = await db.query(
       `INSERT INTO warehouses 
       (blockchain_id, owner_address, name, location, total_area, available_area, 
@@ -72,8 +96,11 @@ exports.createWarehouse = async (req, res) => {
        price_per_sqm_per_day, image_url, description]
     );
 
+    console.log('Warehouse created in database with ID:', result.insertId);
+
     res.status(201).json({
       id: result.insertId,
+      blockchain_id: blockchain_id,
       message: 'Warehouse created successfully'
     });
   } catch (error) {
