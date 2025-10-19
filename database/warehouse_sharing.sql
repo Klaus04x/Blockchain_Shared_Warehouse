@@ -83,30 +83,6 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
--- Cấu trúc bảng cho bảng `reviews`
---
-
-CREATE TABLE `reviews` (
-  `id` int(11) NOT NULL,
-  `warehouse_id` int(11) NOT NULL,
-  `lease_id` int(11) DEFAULT NULL,
-  `reviewer_address` varchar(42) NOT NULL,
-  `rating` int(11) NOT NULL CHECK (`rating` >= 1 and `rating` <= 5),
-  `comment` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Đang đổ dữ liệu cho bảng `reviews`
---
-
-INSERT INTO `reviews` (`id`, `warehouse_id`, `lease_id`, `reviewer_address`, `rating`, `comment`, `created_at`) VALUES
-(1, 1, 1, '0x3456789012345678901234567890123456789012', 5, 'Kho rất tốt, sạch sẽ, bảo vệ nhiệt tình', '2025-10-14 07:54:01'),
-(2, 2, 2, '0x3456789012345678901234567890123456789012', 4, 'Kho đẹp nhưng hơi xa trung tâm', '2025-10-14 07:54:01');
-
--- --------------------------------------------------------
-
---
 -- Cấu trúc bảng cho bảng `transactions`
 --
 
@@ -208,8 +184,6 @@ CREATE TABLE `warehouse_statistics` (
 ,`occupied_area` decimal(11,2)
 ,`total_leases` bigint(21)
 ,`active_leases` bigint(21)
-,`average_rating` decimal(14,4)
-,`total_reviews` bigint(21)
 );
 
 -- --------------------------------------------------------
@@ -219,7 +193,7 @@ CREATE TABLE `warehouse_statistics` (
 --
 DROP TABLE IF EXISTS `warehouse_statistics`;
 
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `warehouse_statistics`  AS SELECT `w`.`id` AS `id`, `w`.`name` AS `name`, `w`.`location` AS `location`, `w`.`total_area` AS `total_area`, `w`.`available_area` AS `available_area`, `w`.`total_area`- `w`.`available_area` AS `occupied_area`, count(distinct `l`.`id`) AS `total_leases`, count(distinct case when `l`.`is_active` = 1 then `l`.`id` end) AS `active_leases`, coalesce(avg(`r`.`rating`),0) AS `average_rating`, count(distinct `r`.`id`) AS `total_reviews` FROM ((`warehouses` `w` left join `leases` `l` on(`w`.`id` = `l`.`warehouse_id`)) left join `reviews` `r` on(`w`.`id` = `r`.`warehouse_id`)) GROUP BY `w`.`id` ;
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `warehouse_statistics`  AS SELECT `w`.`id` AS `id`, `w`.`name` AS `name`, `w`.`location` AS `location`, `w`.`total_area` AS `total_area`, `w`.`available_area` AS `available_area`, `w`.`total_area`- `w`.`available_area` AS `occupied_area`, count(distinct `l`.`id`) AS `total_leases`, count(distinct case when `l`.`is_active` = 1 then `l`.`id` end) AS `active_leases` FROM (`warehouses` `w` left join `leases` `l` on(`w`.`id` = `l`.`warehouse_id`)) GROUP BY `w`.`id` ;
 
 --
 -- Chỉ mục cho các bảng đã đổ
@@ -234,15 +208,6 @@ ALTER TABLE `leases`
   ADD KEY `idx_warehouse` (`warehouse_id`),
   ADD KEY `idx_blockchain` (`blockchain_id`),
   ADD KEY `idx_status` (`is_active`,`is_completed`);
-
---
--- Chỉ mục cho bảng `reviews`
---
-ALTER TABLE `reviews`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `lease_id` (`lease_id`),
-  ADD KEY `idx_warehouse` (`warehouse_id`),
-  ADD KEY `idx_reviewer` (`reviewer_address`);
 
 --
 -- Chỉ mục cho bảng `transactions`
@@ -282,12 +247,6 @@ ALTER TABLE `leases`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
--- AUTO_INCREMENT cho bảng `reviews`
---
-ALTER TABLE `reviews`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
 -- AUTO_INCREMENT cho bảng `transactions`
 --
 ALTER TABLE `transactions`
@@ -314,13 +273,6 @@ ALTER TABLE `warehouses`
 --
 ALTER TABLE `leases`
   ADD CONSTRAINT `leases_ibfk_1` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`);
-
---
--- Các ràng buộc cho bảng `reviews`
---
-ALTER TABLE `reviews`
-  ADD CONSTRAINT `reviews_ibfk_1` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`),
-  ADD CONSTRAINT `reviews_ibfk_2` FOREIGN KEY (`lease_id`) REFERENCES `leases` (`id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

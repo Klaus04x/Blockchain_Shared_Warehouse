@@ -55,15 +55,11 @@ SELECT * FROM warehouses;
 ### Bảng `transactions`
 - Lịch sử giao dịch blockchain
 
-### Bảng `reviews`
-- Đánh giá của khách hàng
-
 ## Dữ liệu mẫu
 File SQL đã bao gồm:
 - 3 users mẫu
 - 5 warehouses mẫu
 - 2 leases mẫu
-- 2 reviews mẫu
 
 ## Cấu hình Backend
 Sau khi import, cập nhật file `backend/.env`:

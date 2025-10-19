@@ -99,6 +99,11 @@ const RegisterWarehouse = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    console.log('=== START WAREHOUSE REGISTRATION ===');
+    console.log('Account:', account);
+    console.log('isConnected:', isConnected);
+    console.log('Form data:', formData);
+
     if (!isConnected) {
       toast.error('Vui lòng kết nối ví MetaMask');
       return;
@@ -112,13 +117,38 @@ const RegisterWarehouse = () => {
     try {
       setProcessing(true);
       
+      console.log('🔄 Refreshing contract...');
       // Refresh contract để đảm bảo sử dụng account hiện tại
       const currentContract = await refreshContract();
       if (!currentContract) {
+        console.error('❌ refreshContract returned null');
         toast.error('Không thể kết nối với hợp đồng. Vui lòng thử lại.');
         setProcessing(false);
         return;
       }
+      console.log('✅ Contract refreshed:', currentContract.target);
+      console.log('✅ Signer address:', await currentContract.runner.getAddress());
+      
+      // Validate và clean data - FORCE limit to prevent blockchain errors
+      let cleanDescription = (formData.description || '').trim();
+      let cleanImageUrl = (formData.imageUrl || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d').trim();
+      
+      // STRICT limit: max 100 characters for description (to be safe)
+      if (cleanDescription.length > 100) {
+        console.warn('⚠️ Description too long! Truncating from', cleanDescription.length, 'to 100 characters');
+        cleanDescription = cleanDescription.substring(0, 100);
+        toast.warning('Mô tả quá dài! Đã được cắt xuống 100 ký tự. Vui lòng rút gọn mô tả.', { autoClose: 5000 });
+      }
+      
+      // Limit imageUrl
+      if (cleanImageUrl.length > 200) {
+        cleanImageUrl = cleanImageUrl.substring(0, 200);
+      }
+      
+      console.log('📝 Cleaned data:');
+      console.log('  Description length:', cleanDescription.length, 'chars');
+      console.log('  Description:', cleanDescription);
+      console.log('  ImageUrl length:', cleanImageUrl.length, 'chars');
       
       const priceInWei = ethers.parseEther(formData.pricePerSqmPerDay);
 
@@ -131,8 +161,8 @@ const RegisterWarehouse = () => {
             formData.name,
             formData.location,
             priceInWei,
-            formData.imageUrl || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d',
-            formData.description,
+            cleanImageUrl,
+            cleanDescription,
             true
           )).wait();
         } catch (err) {
@@ -143,49 +173,233 @@ const RegisterWarehouse = () => {
           location: formData.location,
           available_area: formData.totalArea,
           price_per_sqm_per_day: priceInWei.toString(),
-          image_url: formData.imageUrl,
-          description: formData.description,
+          image_url: cleanImageUrl,
+          description: cleanDescription,
           is_active: 1
         });
         toast.success('Cập nhật kho thành công!');
         navigate('/my-warehouses');
       } else {
-        // Lấy gas settings tối ưu
-        let gasSettings = {};
+        // Gas settings cho Hardhat (legacy transaction)
+        // Hardhat node không hỗ trợ EIP-1559, chỉ dùng gasPrice
+        const gasSettings = {
+          gasPrice: ethers.parseUnits('20', 'gwei'),
+          gasLimit: 500000
+        };
+        console.log('Gas settings (legacy):', gasSettings);
+
+        // Kiểm tra kết nối blockchain và contract
         try {
-          const feeData = await currentContract.runner.provider.getFeeData();
-          gasSettings = {
-            maxFeePerGas: feeData.maxFeePerGas ? feeData.maxFeePerGas * 2n : ethers.parseUnits('20', 'gwei'),
-            maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ? feeData.maxPriorityFeePerGas * 2n : ethers.parseUnits('2', 'gwei'),
-            gasLimit: 500000
-          };
-        } catch (gasErr) {
-          gasSettings = {
-            gasPrice: ethers.parseUnits('20', 'gwei'),
-            gasLimit: 500000
-          };
+          console.log('\n📡 Checking blockchain connection...');
+          
+          // Kiểm tra network
+          const network = await currentContract.runner.provider.getNetwork();
+          console.log('✅ Network:', {
+            chainId: network.chainId.toString(),
+            name: network.name
+          });
+          
+          if (network.chainId !== 1337n) {
+            console.error('❌ Wrong network! Expected 1337, got', network.chainId.toString());
+            toast.error('Vui lòng chuyển sang mạng Localhost 8545 (Chain ID: 1337)');
+            setProcessing(false);
+            return;
+          }
+          
+          // Kiểm tra contract có hoạt động không
+          const currentCounter = await currentContract.warehouseCounter();
+          console.log('✅ Warehouse counter:', currentCounter.toString());
+          
+          // Kiểm tra balance
+          const balance = await currentContract.runner.provider.getBalance(account);
+          console.log('✅ Account balance:', ethers.formatEther(balance), 'ETH');
+          
+          if (balance < ethers.parseEther('0.01')) {
+            console.error('❌ Insufficient balance:', ethers.formatEther(balance));
+            toast.error('Không đủ ETH để thực hiện giao dịch. Vui lòng nạp thêm ETH.');
+            setProcessing(false);
+            return;
+          }
+          
+          console.log('✅ All checks passed! Proceeding with transaction...');
+          
+        } catch (e) {
+          console.error('❌ Blockchain connection error:', e);
+          console.error('Error details:', {
+            message: e.message,
+            code: e.code,
+            stack: e.stack
+          });
+          toast.error('Lỗi kết nối blockchain. Vui lòng kiểm tra Hardhat network và thử lại.');
+          setProcessing(false);
+          return;
         }
 
         // Create on-chain với gas settings
-        const tx = await currentContract.registerWarehouse(
-          formData.name,
-          formData.location,
-          formData.totalArea,
-          priceInWei,
-          formData.imageUrl || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d',
-          formData.description,
-          gasSettings
-        );
-        toast.info('Đang xử lý giao dịch...');
-        const receipt = await tx.wait();
-        const event = receipt.logs.find((log) => {
-          try { const parsed = currentContract.interface.parseLog(log); return parsed.name === 'WarehouseRegistered'; } catch { return false; }
+        console.log('\n🚀 Calling registerWarehouse with:');
+        console.log('  Name:', formData.name);
+        console.log('  Location:', formData.location);
+        console.log('  Total Area:', formData.totalArea);
+        console.log('  Price (Wei):', priceInWei.toString());
+        console.log('  Price (ETH):', ethers.formatEther(priceInWei));
+        console.log('  Gas settings:', gasSettings);
+        
+        let tx, receipt;
+        try {
+          console.log('\n⏳ Sending transaction to blockchain...');
+          tx = await currentContract.registerWarehouse(
+            formData.name,
+            formData.location,
+            formData.totalArea,
+            priceInWei,
+            cleanImageUrl,
+            cleanDescription,
+            gasSettings
+          );
+          toast.info('Đang xử lý giao dịch...');
+          receipt = await tx.wait();
+        } catch (txError) {
+          console.error('Transaction error:', txError);
+          console.error('Error code:', txError.code);
+          console.error('Error message:', txError.message);
+          console.error('Error data:', txError.data);
+          
+          // Xử lý các loại lỗi cụ thể
+          if (txError.code === 'ACTION_REJECTED' || txError.code === 4001) {
+            toast.error('Bạn đã từ chối giao dịch trong MetaMask');
+          } else if (txError.code === 'NETWORK_ERROR' || txError.message.includes('JSON-RPC')) {
+            toast.error('Lỗi kết nối blockchain. Vui lòng kiểm tra Hardhat network và thử lại.');
+          } else if (txError.code === 'INSUFFICIENT_FUNDS' || txError.code === -32000) {
+            toast.error('Không đủ ETH để thực hiện giao dịch. Vui lòng nạp thêm ETH.');
+          } else if (txError.code === 'UNPREDICTABLE_GAS_LIMIT') {
+            toast.error('Lỗi ước tính gas. Có thể giao dịch sẽ thất bại. Vui lòng kiểm tra lại thông tin.');
+          } else if (txError.code === 'NONCE_EXPIRED' || txError.message.includes('nonce')) {
+            toast.error('Lỗi nonce. Vui lòng reset MetaMask account (Settings → Advanced → Reset Account)');
+          } else if (txError.message.includes('execution reverted')) {
+            // Extract revert reason nếu có
+            const reason = txError.reason || txError.data?.message || 'không xác định';
+            toast.error(`Giao dịch bị từ chối bởi smart contract: ${reason}`);
+          } else {
+            // Hiển thị lỗi chi tiết hơn
+            const errorMsg = txError.shortMessage || txError.message || 'Lỗi không xác định';
+            toast.error(`Lỗi giao dịch: ${errorMsg}`);
+            
+            // Gợi ý khắc phục
+            toast.info('💡 Thử: 1) Reset MetaMask account, 2) Reload trang, 3) Kiểm tra console log (F12)', {
+              autoClose: 8000
+            });
+          }
+          return;
+        }
+        
+        console.log('Transaction receipt:', receipt);
+        console.log('Transaction status:', receipt.status);
+        console.log('Transaction logs:', receipt.logs);
+        
+        // Kiểm tra transaction có thành công không
+        if (receipt.status !== 1) {
+          console.error('Transaction failed!');
+          toast.error('Giao dịch thất bại trên blockchain');
+          return;
+        }
+        
+        // Debug tất cả logs
+        console.log('All logs:');
+        receipt.logs.forEach((log, index) => {
+          console.log(`Log ${index}:`, log);
+          try {
+            const parsed = currentContract.interface.parseLog(log);
+            console.log(`Parsed log ${index}:`, parsed);
+          } catch (e) {
+            console.log(`Error parsing log ${index}:`, e.message);
+          }
         });
+        
+        const event = receipt.logs.find((log) => {
+          try { 
+            const parsed = currentContract.interface.parseLog(log); 
+            console.log('Checking log:', parsed.name);
+            return parsed.name === 'WarehouseRegistered'; 
+          } catch (e) { 
+            console.log('Error parsing log:', e.message);
+            return false; 
+          }
+        });
+        
         let warehouseId = 0;
         if (event) {
           const parsed = currentContract.interface.parseLog(event);
           warehouseId = parsed.args.warehouseId.toString();
+          console.log('✅ Warehouse ID from event:', warehouseId);
+        } else {
+          console.error('❌ WarehouseRegistered event not found!');
+          console.log('Available events:', receipt.logs.map(log => {
+            try {
+              const parsed = currentContract.interface.parseLog(log);
+              return parsed.name;
+            } catch (e) {
+              return 'Unknown';
+            }
+          }));
+          
+          // Thử lấy warehouse ID từ warehouseCounter
+          try {
+            const warehouseCounter = await currentContract.warehouseCounter();
+            warehouseId = warehouseCounter.toString();
+            console.log('Using warehouseCounter as fallback:', warehouseId);
+            
+            // Kiểm tra warehouse có tồn tại không
+            if (warehouseId === '0') {
+              console.error('No warehouses found on blockchain');
+              toast.error('Không có warehouse nào trên blockchain');
+              return;
+            }
+          } catch (e) {
+            console.error('Error getting warehouseCounter:', e);
+            
+            // Thử cách khác - kiểm tra transaction có thực sự thành công không
+            try {
+              const tx = await currentContract.runner.provider.getTransaction(receipt.transactionHash);
+              console.log('Transaction details:', tx);
+              
+              if (tx && tx.data) {
+                console.log('Transaction data:', tx.data);
+                // Có thể transaction không thực sự gọi được contract
+                toast.error('Giao dịch không thể gọi smart contract');
+                return;
+              }
+            } catch (txError) {
+              console.error('Error getting transaction details:', txError);
+            }
+            
+            toast.error('Không thể lấy warehouse ID từ blockchain');
+            return;
+          }
         }
+        
+        // Kiểm tra warehouse có tồn tại trên blockchain không
+        try {
+          const createdWarehouse = await currentContract.getWarehouse(warehouseId);
+          console.log('✅ Warehouse created on blockchain:', {
+            id: createdWarehouse.id.toString(),
+            owner: createdWarehouse.owner,
+            name: createdWarehouse.name,
+            isActive: createdWarehouse.isActive
+          });
+          
+          // Kiểm tra owner có đúng không
+          if (createdWarehouse.owner.toLowerCase() !== account.toLowerCase()) {
+            console.warn('⚠️ Warehouse owner mismatch!');
+            console.warn('Expected:', account);
+            console.warn('Actual:', createdWarehouse.owner);
+          }
+        } catch (e) {
+          console.error('Error verifying warehouse on blockchain:', e);
+          toast.error('Không thể xác minh warehouse trên blockchain');
+          return;
+        }
+        
+        console.log('Saving to database with blockchain_id:', warehouseId);
         await axios.post(`${API_URL}/warehouses`, {
           blockchain_id: warehouseId,
           owner_address: account,
@@ -194,9 +408,10 @@ const RegisterWarehouse = () => {
           total_area: formData.totalArea,
           available_area: formData.totalArea,
           price_per_sqm_per_day: priceInWei.toString(),
-          image_url: formData.imageUrl || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d',
-          description: formData.description,
+          image_url: cleanImageUrl,
+          description: cleanDescription,
         });
+        
         toast.success('Đăng ký kho bãi thành công!');
         navigate('/my-warehouses');
       }
@@ -329,7 +544,10 @@ const RegisterWarehouse = () => {
                   onChange={handleChange}
                   multiline
                   rows={4}
-                  placeholder="Mô tả về kho bãi của bạn..."
+                  placeholder="Mô tả về kho bãi của bạn (tối đa 300 ký tự)..."
+                  inputProps={{ maxLength: 100 }}
+                  helperText={`${formData.description?.length || 0}/100 ký tự (Lưu ý: Mô tả quá dài sẽ gây lỗi blockchain)`}
+                  error={formData.description?.length > 100}
                 />
               </Grid>
 

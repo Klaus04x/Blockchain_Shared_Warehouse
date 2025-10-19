@@ -2,6 +2,26 @@
 
 Nền tảng cho thuê kho bãi phi tập trung, an toàn và minh bạch với công nghệ Blockchain.
 
+## 🚀 Quick Start
+
+```bash
+# 1. Cài đặt dependencies
+npm run install-all
+
+# 2. Setup database (import database/warehouse_sharing.sql vào MySQL)
+
+# 3. Cấu hình backend/.env và frontend/.env (xem hướng dẫn bên dưới)
+
+# 4. Chạy tất cả (Hardhat + Backend + Frontend) bằng 1 lệnh
+npm run dev:all
+
+# 5. Import private key vào MetaMask (xem trong terminal output)
+
+# 6. Truy cập http://localhost:3000
+```
+
+**Chỉ cần 1 lệnh `npm run dev:all` và tất cả sẽ tự động khởi động!** ✨
+
 ## Tổng quan
 
 Dự án này là một nền tảng blockchain cho phép người dùng:
@@ -123,48 +143,18 @@ CONTRACT_ADDRESS=
 RPC_URL=http://127.0.0.1:8545
 ```
 
-### 5. Khởi động Hardhat Node
-
-Mở terminal mới (khuyến nghị chạy qua script ở root để luôn bind IPv4 127.0.0.1:8545):
-
-```bash
-# Tại thư mục gốc dự án
-npm run node
-```
-
-Hoặc cách cũ (nếu muốn chạy trực tiếp trong thư mục smart-contract):
-
-```bash
-cd smart-contract
-npx hardhat node --hostname 127.0.0.1 --port 8545
-```
-
-Lưu lại một private key từ output để dùng trong MetaMask.
-
-### 6. Deploy Smart Contract
-
-Mở terminal mới:
-
-```bash
-cd smart-contract
-npm run deploy
-```
-
-Contract sẽ được deploy và ABI files sẽ được tự động copy vào `frontend/src/contracts/` và `backend/contracts/`.
-
-Lưu lại địa chỉ contract được in ra console.
-
-### 7. Cấu hình Frontend
+### 5. Cấu hình Frontend
 
 Tạo file `.env` trong thư mục `frontend/`:
 
 ```env
 REACT_APP_API_URL=http://localhost:5000/api
-REACT_APP_CONTRACT_ADDRESS=<địa_chỉ_contract_vừa_deploy>
 REACT_APP_NETWORK_ID=1337
 ```
 
-### 8. Cấu hình MetaMask
+**Lưu ý:** Contract address sẽ tự động được load từ file contract JSON sau khi deploy.
+
+### 6. Cấu hình MetaMask
 
 #### Thêm Local Network
 1. Mở MetaMask
@@ -179,32 +169,41 @@ REACT_APP_NETWORK_ID=1337
 #### Import Account
 1. Click vào account icon
 2. Chọn "Import Account"
-3. Paste private key từ Hardhat node
+3. Paste private key từ Hardhat node (xem bên dưới)
 4. Import
 
-### 9. Khởi động ứng dụng
+### 7. Khởi động ứng dụng
 
-Chạy tất cả (Hardhat node + Backend + Frontend) bằng 1 lệnh tại thư mục gốc:
+**🚀 CÁCH ĐƠN GIẢN NHẤT - CHỈ CẦN 1 LỆNH:**
 
 ```bash
 npm run dev:all
 ```
 
-Mặc định:
-- Hardhat node: `http://127.0.0.1:8545`
-- Backend: `http://localhost:5000`
-- Frontend: `http://localhost:3000`
+Lệnh này sẽ tự động:
+1. ✅ Khởi động Hardhat Node (http://127.0.0.1:8545)
+2. ✅ Đợi node sẵn sàng và tự động deploy smart contract
+3. ✅ Khởi động Backend (http://localhost:5000)
+4. ✅ Khởi động Frontend (http://localhost:3000)
 
-Hoặc chạy thủ công từng phần (tùy chọn):
+**Lưu ý quan trọng:**
+- Khi terminal hiển thị danh sách accounts, **copy Private Key của Account #0** để import vào MetaMask
+- Ví dụ: `Private key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
+- Giữ terminal này chạy trong suốt quá trình phát triển
+
+**Hoặc chạy thủ công từng phần (nếu cần):**
 
 ```bash
 # Terminal 1 - Hardhat Node
 npm run node
 
-# Terminal 2 - Backend
+# Terminal 2 - Deploy Contract (chờ 2-3 giây sau khi node khởi động)
+npm run deploy
+
+# Terminal 3 - Backend
 cd backend && npm run dev
 
-# Terminal 3 - Frontend
+# Terminal 4 - Frontend
 cd frontend && npm start
 ```
 
@@ -324,25 +323,103 @@ cd frontend && npm start
 
 ## Troubleshooting
 
-### MetaMask không kết nối được
-- Kiểm tra network đã đúng chưa (Localhost 8545)
+### ❌ Lỗi: "Không thể kết nối blockchain"
+
+**Nguyên nhân:** Hardhat node chưa chạy hoặc contract chưa được deploy.
+
+**Giải pháp:**
+```bash
+# Kiểm tra blockchain
+node check-blockchain.js
+
+# Nếu lỗi "ECONNREFUSED", restart lại:
+npm run dev:all
+```
+
+### ❌ Lỗi: "Transaction reverted" hoặc "<unrecognized-selector>"
+
+**Nguyên nhân:** Contract ABI không khớp hoặc chưa được compile đúng.
+
+**Giải pháp:**
+```bash
+# Compile và deploy lại contract
+cd smart-contract
+npx hardhat clean
+npx hardhat compile
+npx hardhat run scripts/deploy.js --network localhost
+
+# Sau đó restart frontend
+cd ../frontend
+npm start
+```
+
+### ❌ Lỗi: "Nonce too high" hoặc "Transaction dropped"
+
+**Nguyên nhân:** MetaMask cache lỗi hoặc transaction cũ bị stuck.
+
+**Giải pháp:**
+1. Mở MetaMask
+2. Settings → Advanced
+3. Click **"Clear activity tab data"** hoặc **"Reset Account"**
+4. Reload trang web (Ctrl + Shift + R)
+
+### ❌ MetaMask không kết nối được
+- Kiểm tra network đã đúng chưa: **Localhost 8545** (Chain ID: 1337)
+- Kiểm tra RPC URL: `http://127.0.0.1:8545`
 - Refresh trang và thử lại
-- Xóa cache MetaMask
+- Reset account trong MetaMask
 
-### Transaction failed
-- Kiểm tra balance trong ví có đủ không
+### ❌ Transaction failed / Insufficient funds
+- Kiểm tra balance trong ví có đủ không (cần ít nhất 0.01 ETH)
+- Nếu dùng account Hardhat mặc định sẽ có 10,000 ETH
 - Kiểm tra gas limit
-- Xem console log để biết lỗi chi tiết
+- Xem console log (F12) để biết lỗi chi tiết
 
-### Database connection error
-- Kiểm tra MySQL đã start chưa
-- Kiểm tra thông tin trong `.env`
-- Import lại database
+### ❌ Database connection error
+- Kiểm tra MySQL đã start trong XAMPP chưa
+- Kiểm tra thông tin trong `backend/.env`
+- Import lại database từ `database/warehouse_sharing.sql`
 
-### Contract not found
-- Kiểm tra đã deploy contract chưa
-- Kiểm tra địa chỉ contract trong `.env`
-- Kiểm tra ABI file đã được copy chưa
+### ❌ Port đã được sử dụng
+```bash
+# Windows: Tìm và kill process đang dùng port
+netstat -ano | findstr :8545
+taskkill /PID <process_id> /F
+
+# Hoặc đổi port khác trong smart-contract/hardhat.config.js
+```
+
+### 🔍 Kiểm tra blockchain
+
+Sử dụng script kiểm tra tự động:
+```bash
+node check-blockchain.js
+```
+
+Script này sẽ kiểm tra:
+- ✅ RPC connection
+- ✅ Smart contract status  
+- ✅ Warehouse counter
+- ✅ Database sync
+
+### 📝 Lệnh hữu ích
+
+```bash
+# Kiểm tra blockchain
+node check-blockchain.js
+
+# Compile contracts
+npm run compile-contracts
+
+# Deploy contract
+npm run deploy
+
+# Start Hardhat node
+npm run node
+
+# Start tất cả
+npm run dev:all
+```
 
 ## License
 

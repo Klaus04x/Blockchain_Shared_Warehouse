@@ -15,6 +15,9 @@ import MyLeases from './pages/MyLeases';
 import RegisterWarehouse from './pages/RegisterWarehouse';
 import Profile from './pages/Profile';
 
+// Create base theme first to get default shadows
+const baseTheme = createTheme();
+
 const theme = createTheme({
   palette: {
     mode: 'light',
@@ -23,7 +26,7 @@ const theme = createTheme({
     background: { default: '#fafafa' }
   },
   shape: { borderRadius: 12 },
-  shadows: Array.from({ length: 25 }, (_, i) => (i < 3 ? 'none' : undefined)),
+  shadows: baseTheme.shadows, // Use default MUI shadows to avoid warnings
   typography: {
     fontFamily: [
       '-apple-system',
@@ -61,7 +64,12 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Web3Provider>
-        <Router>
+        <Router
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true
+          }}
+        >
           <div className="App">
             <Navbar />
             <Routes>

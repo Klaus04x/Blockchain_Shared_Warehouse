@@ -11,7 +11,7 @@ const path = require('path');
 
 // Cấu hình
 const RPC_URL = 'http://127.0.0.1:8545';
-const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'; // Thay đổi theo contract đã deploy
+const CONTRACT_ADDRESS = '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9'; // Thay đổi theo contract đã deploy
 
 async function checkBlockchain() {
   console.log('🔍 Kiểm tra blockchain connection...\n');
@@ -145,3 +145,5 @@ async function checkBlockchain() {
 
 // Chạy kiểm tra
 checkBlockchain().catch(console.error);
+
+

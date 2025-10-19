@@ -178,53 +178,122 @@ const WarehouseDetail = () => {
         toast.warning('Không thể kiểm tra số dư. Tiếp tục giao dịch...');
       }
 
-      // Lấy gas settings tối ưu
-      let gasSettings = {};
-      try {
-        const feeData = await currentContract.runner.provider.getFeeData();
-        console.log('Gas fee data:', {
-          gasPrice: ethers.formatUnits(feeData.gasPrice, 'gwei') + ' Gwei',
-          maxFee: ethers.formatUnits(feeData.maxFeePerGas, 'gwei') + ' Gwei',
-          maxPriorityFee: ethers.formatUnits(feeData.maxPriorityFeePerGas, 'gwei') + ' Gwei'
-        });
+      // Gas settings cho Hardhat (legacy transaction)
+      // Hardhat node không hỗ trợ EIP-1559, chỉ dùng gasPrice
+      const gasSettings = {
+        value: totalPrice,
+        gasPrice: ethers.parseUnits('1', 'gwei'), // Gas price thấp
+        gasLimit: 500000  // Tăng gas limit để tránh "out of gas"
+      };
+      
+      console.log('Using gas settings (legacy):', {
+        value: ethers.formatEther(totalPrice) + ' ETH',
+        gasPrice: '1 Gwei',
+        gasLimit: 500000
+      });
+      console.log('Creating lease for warehouse:', {
+        blockchain_id: warehouse.blockchain_id,
+        area: leaseData.area,
+        duration: leaseData.duration,
+        totalPrice: ethers.formatEther(totalPrice) + ' ETH'
+      });
 
-        // Sử dụng EIP-1559 gas settings cho localhost
-        gasSettings = {
-          value: totalPrice,
-          maxFeePerGas: feeData.maxFeePerGas ? feeData.maxFeePerGas * 2n : ethers.parseUnits('20', 'gwei'), // Tăng gấp đôi để tránh dropped
-          maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ? feeData.maxPriorityFeePerGas * 2n : ethers.parseUnits('2', 'gwei'),
-          gasLimit: 500000 // Gas limit cao để đảm bảo không bị out of gas
-        };
-      } catch (gasErr) {
-        console.warn('Failed to get fee data, using fallback gas settings:', gasErr);
-        // Fallback gas settings cho localhost
-        gasSettings = {
-          value: totalPrice,
-          gasPrice: ethers.parseUnits('20', 'gwei'), // 20 Gwei cho localhost
-          gasLimit: 500000
-        };
+      // Kiểm tra warehouse có tồn tại trên blockchain không
+      try {
+        const blockchainWarehouse = await currentContract.getWarehouse(warehouse.blockchain_id);
+        console.log('Blockchain warehouse data:', {
+          id: blockchainWarehouse.id.toString(),
+          owner: blockchainWarehouse.owner,
+          name: blockchainWarehouse.name,
+          isActive: blockchainWarehouse.isActive,
+          availableArea: blockchainWarehouse.availableArea.toString()
+        });
+        
+        if (!blockchainWarehouse.isActive) {
+          toast.error('Kho này không còn hoạt động trên blockchain');
+          return;
+        }
+        
+        if (blockchainWarehouse.availableArea < leaseData.area) {
+          toast.error('Diện tích có sẵn không đủ');
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking warehouse on blockchain:', error);
+        toast.error('Không thể kiểm tra kho trên blockchain');
+        return;
       }
 
-      console.log('Using gas settings:', gasSettings);
+      // Estimate gas trước khi gọi contract
+      console.log('🔍 Estimating gas for transaction...');
+      try {
+        const estimatedGas = await currentContract.createLease.estimateGas(
+          warehouse.blockchain_id,
+          leaseData.area,
+          leaseData.duration,
+          { value: totalPrice }
+        );
+        console.log('✅ Estimated gas:', estimatedGas.toString());
+        
+        // Dùng estimate + 20% buffer, nhưng không quá 500k để tránh lỗi
+        const gasLimit = Math.min(Math.floor(Number(estimatedGas) * 1.2), 500000);
+        gasSettings.gasLimit = gasLimit;
+        console.log('🎯 Using gas limit:', gasLimit);
+      } catch (estimateError) {
+        console.warn('⚠️ Cannot estimate gas, using default 500k:', estimateError.message);
+        // Giữ nguyên gas limit 500k
+      }
 
       // Gọi smart contract với gas settings tối ưu
-      const tx = await currentContract.createLease(
+      console.log('🚀 Calling createLease with params:', {
+        warehouseId: warehouse.blockchain_id,
+        area: leaseData.area,
+        duration: leaseData.duration,
+        gasSettings
+      });
+      
+      // Thêm timeout cho transaction
+      const txPromise = currentContract.createLease(
         warehouse.blockchain_id,
         leaseData.area,
         leaseData.duration,
         gasSettings
       );
+      
+      // Timeout sau 30 giây
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Transaction timeout after 30 seconds')), 30000);
+      });
+      
+      const tx = await Promise.race([txPromise, timeoutPromise]);
 
       console.log('Transaction sent:', tx.hash);
       toast.info(`Đang xử lý giao dịch... Hash: ${tx.hash.substring(0, 10)}...`);
       const receipt = await tx.wait();
 
+      console.log('Transaction receipt:', receipt);
+      console.log('Transaction logs:', receipt.logs);
+
+      // Debug tất cả logs
+      console.log('All logs:');
+      receipt.logs.forEach((log, index) => {
+        console.log(`Log ${index}:`, log);
+        try {
+          const parsed = currentContract.interface.parseLog(log);
+          console.log(`Parsed log ${index}:`, parsed);
+        } catch (e) {
+          console.log(`Error parsing log ${index}:`, e.message);
+        }
+      });
+
       // Lấy lease ID từ event
       const event = receipt.logs.find((log) => {
         try {
           const parsed = currentContract.interface.parseLog(log);
+          console.log('Checking log:', parsed.name);
           return parsed.name === 'LeaseCreated';
         } catch (e) {
+          console.log('Error parsing log:', e);
           return false;
         }
       });
@@ -233,6 +302,31 @@ const WarehouseDetail = () => {
       if (event) {
         const parsed = currentContract.interface.parseLog(event);
         leaseId = parsed.args.leaseId.toString();
+        console.log('✅ Lease ID from event:', leaseId);
+      } else {
+        console.error('❌ LeaseCreated event not found!');
+        toast.error('Không thể lấy lease ID từ blockchain');
+        return;
+      }
+
+      // Kiểm tra PaymentReceived event
+      const paymentEvent = receipt.logs.find((log) => {
+        try {
+          const parsed = currentContract.interface.parseLog(log);
+          return parsed.name === 'PaymentReceived';
+        } catch (e) {
+          return false;
+        }
+      });
+
+      if (paymentEvent) {
+        const parsed = currentContract.interface.parseLog(paymentEvent);
+        console.log('✅ PaymentReceived event:', {
+          leaseId: parsed.args.leaseId.toString(),
+          amount: ethers.formatEther(parsed.args.amount) + ' ETH'
+        });
+      } else {
+        console.warn('⚠️ PaymentReceived event not found!');
       }
 
       // Lưu vào database
@@ -264,8 +358,10 @@ const WarehouseDetail = () => {
         errorMessage = 'Số dư không đủ để thực hiện giao dịch';
       } else if (error.code === 'USER_REJECTED') {
         errorMessage = 'Bạn đã hủy giao dịch';
-      } else if (error.code === 'NETWORK_ERROR') {
-        errorMessage = 'Lỗi mạng. Vui lòng kiểm tra kết nối và thử lại';
+      } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Internal JSON-RPC error')) {
+        errorMessage = 'Lỗi blockchain. Có thể do: 1) Gas limit quá cao, 2) Transaction data quá lớn, 3) Hardhat node overload. Thử giảm diện tích thuê hoặc thời gian thuê.';
+      } else if (error.message?.includes('Transaction timeout')) {
+        errorMessage = 'Giao dịch quá lâu. Vui lòng thử lại hoặc kiểm tra kết nối blockchain.';
       } else if (error.message?.includes('Warehouse is not active')) {
         errorMessage = 'Kho này không còn hoạt động';
       } else if (error.message?.includes('Invalid area')) {

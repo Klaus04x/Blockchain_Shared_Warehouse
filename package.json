@@ -9,11 +9,22 @@
     "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../smart-contract && npm install",
     "compile-contracts": "cd smart-contract && npx hardhat compile",
     "node": "cd smart-contract && npx hardhat node --hostname 127.0.0.1 --port 8545",
-    "dev:all": "npx concurrently \"npm:node\" \"npm:dev\" \"npm:client\""
+    "deploy": "cd smart-contract && npx hardhat run scripts/deploy.js --network localhost",
+    "dev:all": "npx concurrently \"npm:node\" \"node auto-deploy.js\" \"npm:dev\" \"npm:client\""
   },
-  "keywords": ["blockchain", "warehouse", "sharing", "smart-contract"],
+  "keywords": [
+    "blockchain",
+    "warehouse",
+    "sharing",
+    "smart-contract"
+  ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "^6.15.0",
+    "mysql2": "^3.15.2"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
 }
-
-
