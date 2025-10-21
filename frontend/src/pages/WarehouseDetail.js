@@ -311,8 +311,21 @@ const WarehouseDetail = () => {
         const parsed = currentContract.interface.parseLog(event);
         leaseId = parsed.args.leaseId.toString();
         console.log('✅ Lease ID from event:', leaseId);
+        console.log('✅ Full event data:', {
+          leaseId: parsed.args.leaseId.toString(),
+          warehouseId: parsed.args.warehouseId.toString(),
+          tenant: parsed.args.tenant
+        });
       } else {
         console.error('❌ LeaseCreated event not found!');
+        console.log('Available events:', receipt.logs.map(log => {
+          try {
+            const parsed = currentContract.interface.parseLog(log);
+            return parsed.name;
+          } catch (e) {
+            return 'Unknown';
+          }
+        }));
         toast.error('Không thể lấy lease ID từ blockchain');
         return;
       }
@@ -337,10 +350,44 @@ const WarehouseDetail = () => {
         console.warn('⚠️ PaymentReceived event not found!');
       }
 
+      // Kiểm tra lease ID trên blockchain trước khi lưu database
+      console.log('🔍 Verifying lease on blockchain...');
+      try {
+        const verifyLease = await currentContract.getLease(leaseId);
+        console.log('✅ Lease verification:', {
+          id: verifyLease.id.toString(),
+          tenant: verifyLease.tenant,
+          isActive: verifyLease.isActive,
+          warehouseId: verifyLease.warehouseId.toString()
+        });
+        
+        // Kiểm tra tenant có khớp không
+        if (verifyLease.tenant.toLowerCase() !== account.toLowerCase()) {
+          console.error('❌ Tenant mismatch:', {
+            expected: account,
+            actual: verifyLease.tenant
+          });
+          toast.error('Lỗi: Tenant không khớp trên blockchain');
+          return;
+        }
+      } catch (verifyError) {
+        console.error('❌ Cannot verify lease on blockchain:', verifyError);
+        toast.error('Không thể xác minh hợp đồng trên blockchain');
+        return;
+      }
+
       // Lưu vào database
       const startDate = new Date();
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + parseInt(leaseData.duration));
+
+      console.log('💾 Saving to database:', {
+        blockchain_id: leaseId,
+        warehouse_id: warehouse.id,
+        tenant_address: account,
+        area: leaseData.area,
+        transaction_hash: tx.hash
+      });
 
       await axios.post(`${API_URL}/leases`, {
         blockchain_id: leaseId,
@@ -350,7 +397,7 @@ const WarehouseDetail = () => {
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         total_price: totalPrice.toString(),
-        transaction_hash: receipt.hash,
+        transaction_hash: tx.hash,
       });
 
       toast.success('Tạo hợp đồng thuê thành công!');

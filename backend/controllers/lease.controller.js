@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const TransactionService = require('../services/transaction');
 
 // Lấy tất cả hợp đồng thuê
 exports.getAllLeases = async (req, res) => {
@@ -101,6 +102,23 @@ exports.createLease = async (req, res) => {
       [area, warehouse_id]
     );
 
+    // Lưu transaction vào database
+    if (transaction_hash) {
+      try {
+        await TransactionService.createTransaction({
+          transactionHash: transaction_hash,
+          fromAddress: tenant_address,
+          toAddress: null, // Contract address sẽ được lưu sau
+          type: 'create_lease',
+          amount: total_price,
+          status: 'success'
+        });
+      } catch (txError) {
+        console.error('Error saving transaction:', txError);
+        // Không throw error để không ảnh hưởng đến việc tạo lease
+      }
+    }
+
     res.status(201).json({
       id: result.insertId,
       message: 'Lease created successfully'
@@ -142,6 +160,22 @@ exports.updateLease = async (req, res) => {
         'UPDATE warehouses SET available_area = available_area + ? WHERE id = ?',
         [lease.area, lease.warehouse_id]
       );
+
+      // Lưu transaction khi hoàn thành lease
+      if (is_completed && lease.transaction_hash) {
+        try {
+          await TransactionService.createTransaction({
+            transactionHash: `complete_${lease.transaction_hash}_${Date.now()}`,
+            fromAddress: lease.tenant_address,
+            toAddress: null,
+            type: 'complete_lease',
+            amount: 0, // Không có phí khi hoàn thành
+            status: 'success'
+          });
+        } catch (txError) {
+          console.error('Error saving completion transaction:', txError);
+        }
+      }
     }
 
     res.json({ message: 'Lease updated successfully' });

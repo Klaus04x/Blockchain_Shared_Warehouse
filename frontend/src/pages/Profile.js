@@ -9,13 +9,15 @@ import {
   Button,
   Grid,
   Avatar,
-  Divider,
   CircularProgress,
+  Tabs,
+  Tab,
 } from '@mui/material';
-import { Person, Save } from '@mui/icons-material';
+import { Person, Save, History } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useWeb3 } from '../contexts/Web3Context';
+import TransactionHistory from '../components/TransactionHistory';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -23,6 +25,7 @@ const Profile = () => {
   const { account, isConnected } = useWeb3();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
   const [profile, setProfile] = useState({
     wallet_address: '',
     name: '',
@@ -106,102 +109,125 @@ const Profile = () => {
     );
   }
 
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
+
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <Avatar
+          src={profile.avatar_url}
+          sx={{ width: 80, height: 80, mr: 2 }}
+        >
+          <Person sx={{ fontSize: 40 }} />
+        </Avatar>
+        <Box>
+          <Typography variant="h4" fontWeight="bold">
+            Thông tin cá nhân
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Quản lý thông tin tài khoản và lịch sử giao dịch
+          </Typography>
+        </Box>
+      </Box>
+
       <Card>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs value={activeTab} onChange={handleTabChange}>
+            <Tab 
+              icon={<Person />} 
+              label="Thông tin cá nhân" 
+              iconPosition="start"
+            />
+            <Tab 
+              icon={<History />} 
+              label="Lịch sử giao dịch" 
+              iconPosition="start"
+            />
+          </Tabs>
+        </Box>
+
         <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-            <Avatar
-              src={profile.avatar_url}
-              sx={{ width: 80, height: 80, mr: 2 }}
-            >
-              <Person sx={{ fontSize: 40 }} />
-            </Avatar>
-            <Box>
-              <Typography variant="h4" fontWeight="bold">
-                Thông tin cá nhân
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Quản lý thông tin tài khoản của bạn
-              </Typography>
-            </Box>
-          </Box>
+          {activeTab === 0 && (
+            <form onSubmit={handleSubmit}>
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Địa chỉ ví"
+                    value={account}
+                    disabled
+                    helperText="Địa chỉ ví MetaMask của bạn"
+                  />
+                </Grid>
 
-          <Divider sx={{ my: 3 }} />
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Họ và tên"
+                    name="name"
+                    value={profile.name}
+                    onChange={handleChange}
+                    placeholder="Nhập họ và tên của bạn"
+                  />
+                </Grid>
 
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Địa chỉ ví"
-                  value={account}
-                  disabled
-                  helperText="Địa chỉ ví MetaMask của bạn"
-                />
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Email"
+                    name="email"
+                    type="email"
+                    value={profile.email}
+                    onChange={handleChange}
+                    placeholder="example@email.com"
+                  />
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Số điện thoại"
+                    name="phone"
+                    value={profile.phone}
+                    onChange={handleChange}
+                    placeholder="0123456789"
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="URL Avatar"
+                    name="avatar_url"
+                    value={profile.avatar_url}
+                    onChange={handleChange}
+                    placeholder="https://example.com/avatar.jpg"
+                    helperText="Đường dẫn đến hình ảnh avatar của bạn"
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      size="large"
+                      disabled={saving}
+                      startIcon={saving ? <CircularProgress size={20} /> : <Save />}
+                    >
+                      {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                    </Button>
+                  </Box>
+                </Grid>
               </Grid>
+            </form>
+          )}
 
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Họ và tên"
-                  name="name"
-                  value={profile.name}
-                  onChange={handleChange}
-                  placeholder="Nhập họ và tên của bạn"
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Email"
-                  name="email"
-                  type="email"
-                  value={profile.email}
-                  onChange={handleChange}
-                  placeholder="example@email.com"
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Số điện thoại"
-                  name="phone"
-                  value={profile.phone}
-                  onChange={handleChange}
-                  placeholder="0123456789"
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="URL Avatar"
-                  name="avatar_url"
-                  value={profile.avatar_url}
-                  onChange={handleChange}
-                  placeholder="https://example.com/avatar.jpg"
-                  helperText="Đường dẫn đến hình ảnh avatar của bạn"
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    size="large"
-                    disabled={saving}
-                    startIcon={saving ? <CircularProgress size={20} /> : <Save />}
-                  >
-                    {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-          </form>
+          {activeTab === 1 && (
+            <TransactionHistory userAddress={account} />
+          )}
         </CardContent>
       </Card>
     </Container>

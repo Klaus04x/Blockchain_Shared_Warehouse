@@ -166,7 +166,10 @@ contract WarehouseLeasing is Ownable, ReentrancyGuard {
             "Not authorized"
         );
         require(lease.isActive, "Lease is not active");
-        require(block.timestamp >= lease.endDate, "Lease period not ended");
+        require(!lease.isCompleted, "Lease already completed");
+        
+        // Cho phép hoàn thành hợp đồng bất kỳ lúc nào nếu có quyền
+        // (Đã kiểm tra quyền ở trên rồi)
         
         lease.isActive = false;
         lease.isCompleted = true;

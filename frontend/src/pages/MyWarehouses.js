@@ -11,6 +11,14 @@ import {
   Button,
   CircularProgress,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemText,
+  Divider,
 } from '@mui/material';
 import {
   Add,
@@ -19,19 +27,25 @@ import {
   AttachMoney,
   Edit,
   Delete,
+  CheckCircle,
+  Visibility,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../contexts/Web3Context';
 import { toast } from 'react-toastify';
+import { format } from 'date-fns';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const MyWarehouses = () => {
-  const { account, isConnected } = useWeb3();
+  const { account, isConnected, refreshContract } = useWeb3();
   const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
+  const [selectedWarehouse, setSelectedWarehouse] = useState(null);
+  const [warehouseLeases, setWarehouseLeases] = useState([]);
+  const [leasesDialogOpen, setLeasesDialogOpen] = useState(false);
   const navigate = useNavigate();
 
   const fetchMyWarehouses = useCallback(async () => {
@@ -62,6 +76,60 @@ const MyWarehouses = () => {
     } catch (error) {
       return '0 ETH';
     }
+  };
+
+  const formatDate = (dateString) => {
+    try {
+      return format(new Date(dateString), 'dd/MM/yyyy');
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  const fetchWarehouseLeases = async (warehouseId) => {
+    try {
+      const response = await axios.get(`${API_URL}/leases/warehouse/${warehouseId}`);
+      setWarehouseLeases(response.data);
+    } catch (error) {
+      console.error('Error fetching warehouse leases:', error);
+      toast.error('Không thể tải danh sách hợp đồng');
+    }
+  };
+
+  const handleViewLeases = (warehouse) => {
+    setSelectedWarehouse(warehouse);
+    fetchWarehouseLeases(warehouse.id);
+    setLeasesDialogOpen(true);
+  };
+
+  const handleCompleteLease = async (leaseId, blockchainId) => {
+    try {
+      const currentContract = await refreshContract();
+      if (!currentContract) {
+        toast.error('Không thể kết nối với hợp đồng. Vui lòng thử lại.');
+        return;
+      }
+      
+      const tx = await currentContract.completeLease(blockchainId);
+      toast.info('Đang xử lý...');
+      await tx.wait();
+
+      await axios.put(`${API_URL}/leases/${leaseId}`, {
+        is_active: false,
+        is_completed: true,
+      });
+
+      toast.success('Đã hoàn thành hợp đồng!');
+      fetchWarehouseLeases(selectedWarehouse.id);
+      fetchMyWarehouses();
+    } catch (error) {
+      console.error('Error completing lease:', error);
+      toast.error('Không thể hoàn thành hợp đồng');
+    }
+  };
+
+  const isLeaseExpired = (endDate) => {
+    return new Date(endDate) < new Date();
   };
 
 
@@ -185,7 +253,7 @@ const MyWarehouses = () => {
                     )}
                   </Box>
 
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     <Button
                       size="small"
                       variant="outlined"
@@ -196,6 +264,17 @@ const MyWarehouses = () => {
                       }}
                     >
                       Sửa
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<Visibility />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewLeases(warehouse);
+                      }}
+                    >
+                      Hợp đồng
                     </Button>
                     <Button
                       size="small"
@@ -228,6 +307,102 @@ const MyWarehouses = () => {
           ))}
         </Grid>
       )}
+
+      {/* Dialog hiển thị danh sách hợp đồng */}
+      <Dialog 
+        open={leasesDialogOpen} 
+        onClose={() => setLeasesDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Hợp đồng thuê - {selectedWarehouse?.name}
+        </DialogTitle>
+        <DialogContent>
+          {warehouseLeases.length === 0 ? (
+            <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+              Chưa có hợp đồng thuê nào
+            </Typography>
+          ) : (
+            <List>
+              {warehouseLeases.map((lease, index) => (
+                <React.Fragment key={lease.id}>
+                  <ListItem 
+                    sx={{ alignItems: 'flex-start' }}
+                    secondaryAction={
+                      lease.is_active && !lease.is_completed && isLeaseExpired(lease.end_date) ? (
+                        <Button
+                          variant="contained"
+                          size="small"
+                          color="success"
+                          startIcon={<CheckCircle />}
+                          onClick={() => handleCompleteLease(lease.id, lease.blockchain_id)}
+                        >
+                          Hoàn thành
+                        </Button>
+                      ) : null
+                    }
+                  >
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="h6">
+                            Hợp đồng #{lease.id}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                            {lease.is_completed ? (
+                              <Chip
+                                icon={<CheckCircle />}
+                                label="Đã hoàn thành"
+                                color="success"
+                                size="small"
+                              />
+                            ) : lease.is_active ? (
+                              <Chip
+                                label="Đang hoạt động"
+                                color="primary"
+                                size="small"
+                              />
+                            ) : (
+                              <Chip
+                                label="Đã hủy"
+                                color="error"
+                                size="small"
+                              />
+                            )}
+                          </Box>
+                        </Box>
+                      }
+                      secondary={
+                        <Box>
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>Người thuê:</strong> {lease.tenant_address}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>Diện tích:</strong> {lease.area} m²
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>Thời gian:</strong> {formatDate(lease.start_date)} - {formatDate(lease.end_date)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>Tổng chi phí:</strong> {formatPrice(lease.total_price)}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItem>
+                  {index < warehouseLeases.length - 1 && <Divider />}
+                </React.Fragment>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLeasesDialogOpen(false)}>
+            Đóng
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

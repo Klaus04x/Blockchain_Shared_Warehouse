@@ -15,11 +15,13 @@ const warehouseRoutes = require('./routes/warehouse.routes');
 const leaseRoutes = require('./routes/lease.routes');
 const userRoutes = require('./routes/user.routes');
 const uploadRoutes = require('./routes/upload.routes');
+const transactionRoutes = require('./routes/transaction.routes');
 
 app.use('/api/warehouses', warehouseRoutes);
 app.use('/api/leases', leaseRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/transactions', transactionRoutes);
 
 // Serve static uploads
 app.use('/uploads', express.static(require('path').join(__dirname, 'uploads')));
@@ -34,7 +36,7 @@ app.get('/api', (req, res) => {
   res.json({
     name: 'Warehouse Sharing API',
     status: 'OK',
-    routes: ['/api/health', '/api/warehouses', '/api/leases', '/api/users']
+    routes: ['/api/health', '/api/warehouses', '/api/leases', '/api/users', '/api/transactions']
   });
 });
 
