@@ -18,7 +18,10 @@
     "kill-all": "node kill-all-ports.js",
     "contract-info": "node contract-address-manager.js info",
     "contract-check": "node contract-address-manager.js check",
-    "contract-clear": "node contract-address-manager.js clear"
+    "contract-clear": "node contract-address-manager.js clear",
+    "lease:sync": "node sync-leases.js",
+    "lease:auto-complete": "node auto-complete-expired-leases.js",
+    "lease:service": "node lease-auto-complete-service.js"
   },
   "keywords": [
     "blockchain",

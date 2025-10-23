@@ -91,8 +91,27 @@ const WarehouseDetail = () => {
       return;
     }
 
-    if (parseFloat(leaseData.area) > warehouse.available_area) {
+    // Validation diện tích - chỉ cho phép số nguyên
+    const area = parseFloat(leaseData.area);
+    if (area <= 0) {
+      toast.error('Diện tích phải lớn hơn 0');
+      return;
+    }
+
+    if (!Number.isInteger(area)) {
+      toast.error('Diện tích phải là số nguyên, không cho phép số thập phân');
+      return;
+    }
+
+    if (area > warehouse.available_area) {
       toast.error('Diện tích vượt quá diện tích còn trống');
+      return;
+    }
+
+    // Validation số ngày >= 1
+    const duration = parseInt(leaseData.duration);
+    if (duration < 1) {
+      toast.error('Số ngày thuê phải >= 1');
       return;
     }
 
@@ -655,10 +674,17 @@ const WarehouseDetail = () => {
               label="Diện tích thuê (m²)"
               type="number"
               value={leaseData.area}
-              onChange={(e) => setLeaseData({ ...leaseData, area: e.target.value })}
-              inputProps={{ min: 1, max: warehouse.available_area }}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Chỉ cho phép số nguyên dương
+                if (value === '' || (parseInt(value) >= 0 && Number.isInteger(parseFloat(value)))) {
+                  setLeaseData({ ...leaseData, area: value });
+                }
+              }}
+              inputProps={{ min: 1, max: warehouse.available_area, step: 1 }}
               sx={{ mb: 2 }}
-              helperText={`Tối đa: ${warehouse.available_area} m²`}
+              helperText={`Tối đa: ${warehouse.available_area} m² • Chỉ số nguyên`}
+              error={leaseData.area && !Number.isInteger(parseFloat(leaseData.area))}
             />
 
             <TextField
@@ -666,9 +692,16 @@ const WarehouseDetail = () => {
               label="Thời gian thuê (ngày)"
               type="number"
               value={leaseData.duration}
-              onChange={(e) => setLeaseData({ ...leaseData, duration: e.target.value })}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Chặn số âm, chỉ cho >= 1
+                if (value === '' || parseInt(value) >= 1) {
+                  setLeaseData({ ...leaseData, duration: value });
+                }
+              }}
               inputProps={{ min: 1 }}
               sx={{ mb: 2 }}
+              helperText="Tối thiểu: 1 ngày"
             />
 
             {leaseData.area && leaseData.duration && (

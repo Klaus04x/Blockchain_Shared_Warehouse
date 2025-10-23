@@ -15,6 +15,7 @@ class PersistentBlockchainManager {
   constructor() {
     this.hardhatProcess = null;
     this.isNodeReady = false;
+    this.autoCompleteInterval = null;
   }
 
   /**
@@ -264,6 +265,119 @@ class PersistentBlockchainManager {
   }
 
   /**
+   * Tự động hoàn thành leases hết hạn
+   */
+  async autoCompleteExpiredLeases() {
+    const mysql = require('mysql2/promise');
+    let connection = null;
+
+    try {
+      connection = await mysql.createConnection({
+        host: 'localhost',
+        user: 'root',
+        password: '',
+        database: 'warehouse_sharing'
+      });
+
+      const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
+      const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+      const wallet = new ethers.Wallet(privateKey, provider);
+
+      const contractData = ContractAddressManager.getContractAddress();
+      if (!contractData) return;
+
+      const contract = new ethers.Contract(contractData.address, contractData.abi, wallet);
+
+      // Lấy các lease hết hạn
+      const [expiredLeases] = await connection.execute(`
+        SELECT id, blockchain_id, warehouse_id, area
+        FROM leases
+        WHERE is_active = 1 AND is_completed = 0 AND end_date < NOW()
+      `);
+
+      if (expiredLeases.length === 0) {
+        console.log(`\n[AUTO-COMPLETE] ✅ Không có lease hết hạn - ${new Date().toLocaleString()}`);
+        return;
+      }
+
+      console.log('\n' + '='.repeat(50));
+      console.log(`[AUTO-COMPLETE] ⏰ Tìm thấy ${expiredLeases.length} hợp đồng hết hạn`);
+      console.log(`[AUTO-COMPLETE] 📅 ${new Date().toLocaleString()}`);
+      console.log('='.repeat(50));
+
+      for (const lease of expiredLeases) {
+        try {
+          const blockchainLease = await contract.getLease(lease.blockchain_id);
+          
+          if (blockchainLease.tenant === ethers.ZeroAddress) {
+            // Lease không tồn tại trên blockchain - chỉ cập nhật database
+            await connection.execute(
+              'UPDATE leases SET is_active = 0, is_completed = 1 WHERE id = ?',
+              [lease.id]
+            );
+            await connection.execute(
+              'UPDATE warehouses SET available_area = available_area + ? WHERE id = ?',
+              [lease.area, lease.warehouse_id]
+            );
+            console.log(`[AUTO-COMPLETE] ✅ Hoàn thành Lease #${lease.id} (chỉ DB)`);
+            continue;
+          }
+
+          if (blockchainLease.isCompleted || !blockchainLease.isActive) {
+            await connection.execute(
+              'UPDATE leases SET is_active = ?, is_completed = ? WHERE id = ?',
+              [blockchainLease.isActive, blockchainLease.isCompleted, lease.id]
+            );
+            console.log(`[AUTO-COMPLETE] ✅ Đồng bộ Lease #${lease.id}`);
+            continue;
+          }
+
+          // Hoàn thành trên blockchain
+          const tx = await contract.completeLease(lease.blockchain_id, { gasLimit: 500000 });
+          await tx.wait();
+          
+          await connection.execute(
+            'UPDATE leases SET is_active = 0, is_completed = 1 WHERE id = ?',
+            [lease.id]
+          );
+
+          console.log(`[AUTO-COMPLETE] ✅ Hoàn thành Lease #${lease.id} (Blockchain + DB)`);
+
+        } catch (error) {
+          console.log(`[AUTO-COMPLETE] ❌ Lỗi Lease #${lease.id}: ${error.message}`);
+        }
+      }
+
+    } catch (error) {
+      // Silent fail - không ảnh hưởng hệ thống
+    } finally {
+      if (connection) await connection.end();
+    }
+  }
+
+  /**
+   * Khởi động auto-complete service
+   */
+  startAutoCompleteService() {
+    console.log('\n' + '='.repeat(50));
+    console.log('🤖 AUTO-COMPLETE SERVICE');
+    console.log('='.repeat(50));
+    console.log('⏰ Kiểm tra leases hết hạn mỗi 30 giây');
+    console.log('✅ Service đã khởi động!');
+    console.log('='.repeat(50) + '\n');
+    
+    // Chạy ngay lần đầu
+    setTimeout(() => {
+      this.autoCompleteExpiredLeases();
+    }, 5000); // Đợi 5 giây để hệ thống ổn định
+    
+    // Sau đó chạy mỗi 30 giây
+    this.autoCompleteInterval = setInterval(() => {
+      this.autoCompleteExpiredLeases();
+    }, 30000); // 30 giây
+  }
+
+  /**
    * Khởi động toàn bộ hệ thống
    */
   async start() {
@@ -289,14 +403,18 @@ class PersistentBlockchainManager {
       // Bước 3: Sync warehouses
       await this.syncWarehouses();
 
+      // Bước 4: Khởi động auto-complete service
+      this.startAutoCompleteService();
+
       console.log('\n' + '='.repeat(50));
       console.log('🎉 HỆ THỐNG BLOCKCHAIN PERSISTENT ĐÃ SẴN SÀNG!');
       console.log('='.repeat(50));
       console.log('✅ Hardhat node: Đang chạy với trạng thái persistent');
       console.log('✅ Contract: Hoạt động bình thường');
       console.log('✅ Warehouses: Đã đồng bộ từ database');
+      console.log('✅ Auto-Complete: Đang chạy (mỗi 30 giây)');
       console.log('✅ Blockchain: Sẵn sàng sử dụng');
-      console.log('\n💡 Các warehouses của bạn giờ đã an toàn!');
+      console.log('\n💡 Hợp đồng sẽ tự động hoàn thành khi hết hạn!');
       console.log('🚀 Bạn có thể chạy: npm run dev:all:preserve');
 
       return true;
@@ -311,6 +429,12 @@ class PersistentBlockchainManager {
    * Dừng Hardhat node
    */
   stop() {
+    if (this.autoCompleteInterval) {
+      console.log('🛑 Đang dừng Auto-Complete Service...');
+      clearInterval(this.autoCompleteInterval);
+      this.autoCompleteInterval = null;
+    }
+    
     if (this.hardhatProcess) {
       console.log('🛑 Đang dừng Hardhat node...');
       this.hardhatProcess.kill();

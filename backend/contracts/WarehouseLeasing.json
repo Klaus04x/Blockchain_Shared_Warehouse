@@ -737,12 +737,12 @@
       "outputs": []
     }
   ],
-  "deployedAt": "2025-10-21T02:37:52.998Z",
+  "deployedAt": "2025-10-23T15:44:14.796Z",
   "deployInfo": {
     "chainId": 1337,
     "network": "localhost",
     "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
     "gasUsed": "Unknown",
-    "blockNumber": 7
+    "blockNumber": 1
   }
 }
